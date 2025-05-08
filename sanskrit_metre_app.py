@@ -62,21 +62,27 @@ def classify_pathya(syllables: list[str]) -> bool:
 
 # ===== Визуализация сетки (с IAST-слогами) =====
 def visualize_grid(syllables: list[str], line_length: int) -> None:
+    # Сохраняем IAST для отображения
     display = [transliterate(s, sanscript.SLP1, sanscript.IAST) for s in syllables]
 
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = plt.subplots(figsize=(6, 6), constrained_layout=True)
     ax.set_xlim(0, line_length)
     ax.set_ylim(0, line_length)
     ax.axis('off')
     ax.set_aspect('equal')
 
-    lines = [syllables[i:i+line_length] for i in range(0, len(syllables), line_length)]
-    display_lines = [display[i:i+line_length] for i in range(0, len(display), line_length)]
+    # Разбивка на строки
+    lines = [syllables[i:i + line_length] for i in range(0, len(syllables), line_length)]
+    display_lines = [display[i:i + line_length] for i in range(0, len(display), line_length)]
     while len(lines) < line_length:
         lines.append([])
         display_lines.append([])
 
-    # Рисуем сетку и слоги с уменьшенным шрифтом
+    # Определяем базовый размер шрифта в зависимости от размера сетки
+    base_fs = 12
+    fs = base_fs if line_length <= 8 else (base_fs * 8 / line_length)
+
+    # Рисуем клетки и слоги
     for i, (row, drow) in enumerate(zip(lines, display_lines)):
         for j in range(line_length):
             y = line_length - 1 - i
@@ -85,17 +91,25 @@ def visualize_grid(syllables: list[str], line_length: int) -> None:
             guru = is_guru_syllable_slp1(syl)
             face = 'black' if guru else 'white'
             txt_color = 'white' if guru else 'black'
+            # Квадрат
             ax.add_patch(Rectangle((j, y), 1, 1, facecolor=face, edgecolor='black'))
+            # Текст по центру
             if disp:
-                ax.text(j + 0.5, y + 0.5, disp,
-                        ha='center', va='center', color=txt_color, fontsize=6)
+                ax.text(
+                    j + 0.5, y + 0.5, disp,
+                    ha='center', va='center',
+                    color=txt_color,
+                    fontsize=fs,
+                    fontfamily='sans-serif'
+                )
 
-    # Рисуем випулы и Pathyā
-    for start in range(0, min(len(syllables), 32*108), 32):
+    # Рисуем випулы и Pathyā-anuṣṭubh
+    for start in range(0, min(len(syllables), 32 * 108), 32):
         if start + 32 > len(syllables):
             break
-        block = syllables[start:start+32]
-        v1, v2 = identify_vipula(block[0:4]), identify_vipula(block[16:20])
+        block = syllables[start:start + 32]
+        v1 = identify_vipula(block[0:4])
+        v2 = identify_vipula(block[16:20])
         top_row = line_length - 1 - (start // line_length)
         mid_row = top_row - 2
         for idx, vip in enumerate((v1, v2)):
@@ -104,15 +118,17 @@ def visualize_grid(syllables: list[str], line_length: int) -> None:
                 for j in range(4):
                     ax.add_patch(Rectangle((j, r), 1, 1,
                                             facecolor=vipula_colors[vip], alpha=0.65))
-    if classify_pathya(syllables):
-        ax.set_title(f"{line_length}×{line_length} Grid — Pathyā-anuṣṭubh", fontsize=10)
-    else:
-        ax.set_title(f"{line_length}×{line_length} Grid", fontsize=10)
 
-    legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu'),
-              Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā')]
+    # Заголовок и легенда
+    title = f"{line_length}×{line_length} Grid"
+    if classify_pathya(syllables):
+        title += " — Pathyā-anuṣṭubh"
+    ax.set_title(title, fontsize=10)
+
+    legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu')]
     for name, col in vipula_colors.items():
         legend.append(Patch(facecolor=col, alpha=0.65, label=name))
+    legend.append(Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā'))
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=4, fontsize=8)
     st.pyplot(fig)
 
