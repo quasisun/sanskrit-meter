@@ -172,10 +172,9 @@ def visualize_lines(lines: List[List[str]]) -> None:
             ax.add_patch(Rectangle((0, y0), w, height, fill=False,
                                     edgecolor='red', linewidth=2, linestyle=':', zorder=4))
 
-    # 4) Легенда
+        # 4) Легенда (увеличенный шрифт и ниже сетки)
     legend = [Patch(facecolor='black', label='Guru'),
               Patch(facecolor='white', label='Laghu')]
-    # Vipula colors
     for name, col in vipula_colors.items():
         legend.append(Patch(facecolor=col, alpha=0.45, label=f'Vipula: {name}'))
     legend.extend([
@@ -184,10 +183,13 @@ def visualize_lines(lines: List[List[str]]) -> None:
         Patch(edgecolor='green', fill=False, linestyle='--', linewidth=2, label='Pāda‑ādi Yamaka'),
         Patch(edgecolor='red', fill=False, linestyle=':', linewidth=2, label='Pāda‑anta Yamaka')
     ])
-    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15),
-              ncol=3, fontsize=8, frameon=False)
+    # добавляем отступ снизу, чтобы легенда не наезжала
+    fig.subplots_adjust(bottom=0.28)
+    ax.legend(handles=legend, loc='upper center', bbox_to_anchor=(0.5, -0.18),
+              ncol=2, fontsize=12, frameon=False)
 
     st.pyplot(fig)
+    plt.close(fig)(fig)
     plt.close(fig)
 
 # ===== UI =====
