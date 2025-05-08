@@ -1,85 +1,106 @@
-import streamlit as st
 import matplotlib.pyplot as plt
 import re
 import unicodedata
-from indic_transliteration.sanscript import transliterate
+from indic_transliteration.sanscript import SchemeMap, SCHEMES, transliterate, DEVANAGARI, TAMIL, IAST
 
-# Vowel definitions
+# Список гласных
 short_vowels = ['a', 'i', 'u', 'ṛ', 'ḷ']
 long_vowels = ['ā', 'ī', 'ū', 'ṝ', 'e', 'ai', 'o', 'au']
-
-def normalize_text(text):
-    text = unicodedata.normalize('NFC', text)
-    text = re.sub(r'[।॥|॥]', '', text)
-    return text.strip()
+all_vowels = short_vowels + long_vowels
+consonants = '[kgṅcjñṭḍṇtdnpbmyrlvśṣsh]'
 
 def detect_script(text):
-    if any('\u0B80' <= c <= '\u0BFF' for c in text):
-        return 'tamil'
-    elif any('\u0900' <= c <= '\u097F' for c in text):
-        return 'devanagari'
-    else:
-        return 'iast'
+    if re.search(r'[\u0900-\u097F]', text):
+        return DEVANAGARI
+    if re.search(r'[\u0B80-\u0BFF]', text):
+        return TAMIL
+    return IAST
 
-def transliterate_to_iast(text):
+def normalize(text):
     script = detect_script(text)
-    if script == 'iast':
-        return text.lower()
-    return transliterate(text, script, 'iast').lower()
+    if script != IAST:
+        text = transliterate(text, script, IAST)
+    text = text.lower()
+    text = unicodedata.normalize('NFC', text)
+    text = re.sub(r'[।॥|॥]', '', text)  # удаление данд
+    return text.strip()
 
 def split_syllables(text):
-    return re.findall(r'[^aeiouṛḷāīūṝeoau]*[aeiouṛḷāīūṝeoau]+(?:[ṃḥ])?', text)
+    text = re.sub(r'\s+', '', text)
+    pattern = r"""
+        ([^aeiouāīūṛṝeaiouṃḥ]*         # нач. согласные
+         [aeiouāīūṛṝeaiou]             # гласная
+         (?:ṃ|ḥ)?                      # анусвара или висарга
+         (?:{c}(?!h))?)                # возможная финальная согласная
+    """.format(c=consonants)
+    syllables = re.findall(pattern, text, re.VERBOSE)
+    return [s[0] for s in syllables if s[0]]
 
 def is_guru(syl):
-    if any(v in syl for v in long_vowels):
+    v = re.search(r'[aeiouāīūṛṝeaiou]', syl)
+    if not v:
+        return False
+    vowel = v.group()
+
+    if vowel in long_vowels:
         return True
-    if syl.endswith('ṃ') or syl.endswith('ḥ'):
+    if re.search(r'[ṃḥ]', syl):
+        return True
+    if re.search(r'[aeiouṛḷ]..', syl):
         return True
     return False
 
-def make_blocks(syllables, row_length, rows_per_block=8):
-    block_size = row_length * rows_per_block
-    return [syllables[i:i+block_size] for i in range(0, len(syllables), block_size)]
+def chunk_list(lst, size):
+    return [lst[i:i + size] for i in range(0, len(lst), size)]
 
-def syllables_to_grid(syllables, row_length):
-    grid = []
-    for i in range(0, len(syllables), row_length):
-        row = syllables[i:i+row_length]
-        binary = [1 if is_guru(s) else 0 for s in row]
-        binary += [0]*(row_length - len(binary))
-        grid.append(binary)
-    while len(grid) < 8:
-        grid.append([0]*row_length)
-    return grid
+def pad_grid(rows, width):
+    for row in rows:
+        row += [0] * (width - len(row))
+    while len(rows) < width:
+        rows.append([0] * width)
+    return rows
 
-def plot_grid(grid, index, row_length):
-    fig, ax = plt.subplots(figsize=(row_length / 2, 4))
-    ax.imshow(grid, cmap='gray', interpolation='nearest')
-    ax.axis('off')
-    ax.set_title(f'Block {index+1} ({row_length}×8)')
-    st.pyplot(fig)
+def syllables_to_grid(syllables, line_length):
+    lines = chunk_list(syllables, line_length)
+    bin_lines = [[1 if is_guru(s) else 0 for s in line] for line in lines]
+    return pad_grid(bin_lines, line_length)
 
-# === Streamlit Interface ===
+def plot_grid(grid, index, line_length):
+    plt.figure(figsize=(4, 4))
+    plt.imshow(grid, cmap='gray', interpolation='nearest')
+    plt.axis('off')
+    plt.title(f'Block {index+1} ({line_length}×{line_length})')
+    plt.savefig(f'grid_{line_length}x{line_length}_block_{index+1:02d}.png', bbox_inches='tight', pad_inches=0)
+    plt.close()
 
-st.title("Sanskrit Meter Visualizer")
-st.markdown("Upload Sanskrit or Tamil text. Select the block size for syllable grouping.")
+def process_text(text, line_length):
+    text = normalize(text)
+    syllables = split_syllables(text)
+    block_size = line_length * line_length
+    blocks = chunk_list(syllables, block_size)
 
-text_input = st.text_area("Paste your Sanskrit or Tamil text below:", height=200)
+    for i, block in enumerate(blocks):
+        grid = syllables_to_grid(block, line_length)
+        plot_grid(grid, i, line_length)
 
-row_length = st.selectbox("Syllables per line (row):", [8, 16, 32], index=0)
+# === Примеры ===
 
-if st.button("Generate Visualization"):
-    if not text_input.strip():
-        st.warning("Please enter some text.")
-    else:
-        try:
-            iast = transliterate_to_iast(normalize_text(text_input))
-            syllables = split_syllables(iast)
-            blocks = make_blocks(syllables, row_length=row_length)
+# Деванагари
+dev_text = """
+कर्मण्येवाधिकारस्ते मा फलेषु कदाचन।
+मा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि॥
+"""
 
-            for i, block in enumerate(blocks):
-                grid = syllables_to_grid(block, row_length)
-                plot_grid(grid, i, row_length)
+# Тамильский (пример — теварам, но ты можешь вставить свой)
+tam_text = "ஓம் நமோ நாராயணாய"
 
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
+# IAST
+iast_text = """
+vande gurūṇāṁ caraṇāravinde sandārśita svātma sukhāvabodhe
+"""
+
+# === Выбор текста ===
+input_text = dev_text  # замените на tam_text или iast_text
+
+line_length = 8  # или 16, 32
+process_text(input_text, line_length)
