@@ -68,15 +68,17 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
     total = len(syllables)
     rows = math.ceil(total / columns)
 
-    fig, ax = plt.subplots(figsize=(columns, rows), constrained_layout=True)
+    # Масштабируем размер фигуры пропорционально количеству слогов
+    fig_width = columns / 8 * 6
+    fig_height = rows / 8 * 6
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
     ax.set_xlim(0, columns)
     ax.set_ylim(0, rows)
     ax.axis('off')
     ax.set_aspect('equal')
 
-    # Определяем базовый размер шрифта
-    base_fs = 12
-    fs = base_fs * min(1, 8 / columns)
+    # Фиксированный размер шрифта для читаемости
+    fs = 12
 
     # Рисуем клетки и слоги
     for idx, syl in enumerate(syllables):
@@ -98,9 +100,7 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
         v2 = identify_vipula(block[16:20])
         for idx, vip in enumerate((v1, v2)):
             if vip in vipula_colors:
-                # позиция первого слога śloka
                 start_idx = start
-                # для v1: первый ряд śloka; для v2: третий ряд ślока
                 rel_row = 0 if idx == 0 else 2
                 row = rows - 1 - ((start_idx // columns) + rel_row)
                 for j in range(4):
