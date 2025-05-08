@@ -1,24 +1,20 @@
-
-import streamlit as st
-from indic_transliteration import sanscript
-from indic_transliteration.sanscript import transliterate
+import matplotlib.pyplot as plt
 import re
 import unicodedata
-import matplotlib.pyplot as plt
-import numpy as np
 
+# Упрощённый список санскритских гласных
 short_vowels = ['a', 'i', 'u', 'ṛ', 'ḷ']
 long_vowels = ['ā', 'ī', 'ū', 'ṝ', 'e', 'ai', 'o', 'au']
 
-def normalize_iast(text):
-    return unicodedata.normalize('NFC', text.lower())
-
-def dev_to_iast(text):
-    return transliterate(text, sanscript.DEVANAGARI, sanscript.IAST)
+def normalize(text):
+    text = text.lower()
+    text = unicodedata.normalize('NFC', text)
+    text = re.sub(r'[।॥|॥]', '', text)  # убираем данды
+    return text.strip()
 
 def split_syllables(text):
-    syllables = re.findall(r'[^aeiouṛḷāīūṝeoau]*[aeiouṛḷāīūṝeoau]+(?:[ṃḥ]?)', text)
-    return syllables
+    # Очень упрощённое разбиение на слоги
+    return re.findall(r'[^aeiouṛḷāīūṝeoau]*[aeiouṛḷāīūṝeoau]+(?:[ṃḥ])?', text)
 
 def is_guru(syllable):
     for lv in long_vowels:
@@ -28,39 +24,57 @@ def is_guru(syllable):
         return True
     return False
 
-def process_verse(text, transliterate_from_dev=True):
-    if transliterate_from_dev:
-        text = dev_to_iast(text)
-    text = normalize_iast(text)
-    lines = text.strip().split('\n')
+def chunk_syllables(syllables, line_length):
+    # Делит слоги на строки по line_length слогов
+    return [syllables[i:i + line_length] for i in range(0, len(syllables), line_length)]
+
+def pad_grid(rows, width):
+    for row in rows:
+        row += [0] * (width - len(row))
+    while len(rows) < width:
+        rows.append([0] * width)
+    return rows
+
+def syllables_to_grid(lines, width):
     grid = []
     for line in lines:
-        syllables = split_syllables(line)
-        row = [1 if is_guru(syl) else 0 for syl in syllables]
+        row = [1 if is_guru(s) else 0 for s in line]
         grid.append(row)
-    return grid
+    return pad_grid(grid, width)
 
-def plot_grid(grid):
-    max_len = max(len(row) for row in grid)
-    padded = [row + [0] * (max_len - len(row)) for row in grid]
-    arr = np.array(padded)
+def plot_grid(grid, index, width):
+    plt.figure(figsize=(4, 4))
+    plt.imshow(grid, cmap='gray', interpolation='nearest')
+    plt.axis('off')
+    plt.title(f'Block {index+1} ({width}×{width})')
+    plt.savefig(f'grid_{width}x{width}_block_{index+1:02d}.png', bbox_inches='tight', pad_inches=0)
+    plt.close()
 
-    fig, ax = plt.subplots(figsize=(max_len, len(grid)))
-    ax.imshow(arr, cmap='gray', interpolation='nearest')
-    ax.set_xticks([])
-    ax.set_yticks([])
-    st.pyplot(fig)
+def process_text(text, line_length):
+    text = normalize(text)
+    syllables = split_syllables(text)
 
-st.title("Санскрит: анализ гуру и лакху")
-st.markdown("Определи тяжёлые и лёгкие слоги в шлоке санскритской поэзии (IAST или Деванагари).")
+    # Один блок = квадрат line_length x line_length слогов
+    block_size = line_length * line_length
+    blocks = [syllables[i:i + block_size] for i in range(0, len(syllables), block_size)]
 
-input_text = st.text_area("Введи текст на санскрите (IAST или Деванагари):", height=200)
-is_devanagari = st.checkbox("Это текст в Деванагари?", value=True)
+    for i, block in enumerate(blocks):
+        lines = chunk_syllables(block, line_length)
+        grid = syllables_to_grid(lines, line_length)
+        plot_grid(grid, i, line_length)
 
-if st.button("Анализировать"):
-    if not input_text.strip():
-        st.warning("Пожалуйста, введите текст.")
-    else:
-        grid = process_verse(input_text, transliterate_from_dev=is_devanagari)
-        st.success("Вот визуализация слогов:")
-        plot_grid(grid)
+# === ПРИМЕР ===
+iast_text = """
+vande gurūṇāṁ caraṇāravinde sandārśita svātma sukhāvabodhe
+niḥśreyase jāṅgalikāyamāne saṁsāra hālāhala mohaśāntyai
+guruḥ kṛpātmā daiva-svarūpaḥ śiṣya-priyānanda-vighāta-śāntiḥ
+"""
+
+# ==== ВЫБОР ====
+# 8  = пада (1 строка = 8 слогов, 1 шлока = 4 строки)
+# 16 = половина шлоки
+# 32 = целая шлока в строку
+
+line_length = 8  # ← измени на 16 или 32 по желанию
+
+process_text(iast_text, line_length)
