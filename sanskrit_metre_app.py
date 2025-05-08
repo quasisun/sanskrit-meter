@@ -4,143 +4,132 @@ from matplotlib.patches import Rectangle, Patch
 import re
 import unicodedata
 import math
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from indic_transliteration import sanscript
 from indic_transliteration.sanscript import transliterate
 
 # ===== Преобразование IAST → SLP1 =====
 def normalize(text: str) -> str:
-    """Нормализует текст и транслитерирует из IAST в SLP1"""
     t = unicodedata.normalize('NFC', text.strip())
     t = re.sub(r'[।॥\d]', '', t)
     return transliterate(t, sanscript.IAST, sanscript.SLP1)
 
 # ===== Сегментация на слоги SLP1 =====
 def split_syllables_slp1(text: str) -> List[str]:
-    """
-    Делит SLP1-строку на слоги по классическим фонетическим правилам:
-    - Каждый слог содержит ровно один гласный.
-    - Согласные до гласного (onset) остаются вместе.
-    - Согласные после гласного (coda): если их ≥2, первая остаётся тут, остальные переходят в следующий слог.
-    - Аннусвара/висарга (M, H) всегда в coda.
-    """
     s = re.sub(r"\s+", "", text)
     vowels = set('aAiIuUfFxXeEoO')
     n = len(s)
     sylls: List[str] = []
     pos = 0
     while pos < n:
-        # ищем nucleus
         j = pos
         while j < n and s[j] not in vowels:
             j += 1
-        if j >= n:
-            break
-        # включаем nucleus и возможный M/H
+        if j >= n: break
         k = j + 1
-        if k < n and s[k] in ('M', 'H'):
-            k += 1
-        # собираем кластер после гласного
+        if k < n and s[k] in ('M','H'): k += 1
         cstart = k
-        while k < n and s[k] not in vowels:
-            k += 1
+        while k < n and s[k] not in vowels: k += 1
         cluster = s[cstart:k]
-        # делим кластер
-        if len(cluster) <= 1:
-            cut = k
-        else:
-            cut = cstart + 1
+        cut = k if len(cluster) <= 1 else cstart + 1
         sylls.append(s[pos:cut])
         pos = cut
-    # остаток добавляем к последнему слогу
     if pos < n:
         rem = s[pos:]
-        if sylls:
-            sylls[-1] += rem
-        else:
-            sylls = [rem]
+        if sylls: sylls[-1] += rem
+        else: sylls = [rem]
     return sylls
 
 # ===== Определение гуру/лакху =====
-long_vowels = set(['A', 'I', 'U', 'F', 'X', 'e', 'E', 'o', 'O'])
+long_vowels = set(['A','I','U','F','X','e','E','o','O'])
 def is_guru(s: str) -> bool:
-    """Возвращает True, если слог тяжелый (guru), иначе False (laghu)"""
     m = re.match(r'^([^aAiIuUfFxXeEoOMH]*)([aAiIuUfFxXeEoO])([MH]?)(.*)$', s)
-    if not m:
-        return False
+    if not m: return False
     _, vowel, nasal, after = m.groups()
-    return (vowel in long_vowels) or bool(nasal) or len(after) >= 2
+    return vowel in long_vowels or bool(nasal) or len(after) >= 2
 
-# ===== Определение випулы =====
-vipula_colors = {
-    'Nagari': '#FF7F00',
-    'Bhavani': '#1E3F66',
-    'Shardula': '#2E8B57',
-    'Arya': '#8B0000',
-    'Vidyunmala': '#9932CC'
-}
-def identify_vipula(sylls: List[str]) -> Optional[str]:
-    """Определяет тип випулы по первой четверке слогов"""
-    if len(sylls) < 4:
-        return None
-    pattern = ''.join('g' if is_guru(s) else 'l' for s in sylls[:4])
-    mapping = {
-        'lglg': 'Nagari',
-        'lllg': 'Bhavani',
-        'llgg': 'Shardula',
-        'glgg': 'Arya',
-        'gglg': 'Vidyunmala'
-    }
-    return mapping.get(pattern)
+# ===== Метрики: pathya anuṣṭubh, yamaka, anuprāsa =====
+def classify_pathya(block: List[str]) -> bool:
+    # объединяем 32 слога śloka
+    if len(block) < 32: return False
+    s = block[:32]
+    # проверяем группы 3rd pāda & 4th pāda слоги 5-7
+    p3, p4 = s[16:24], s[24:32]
+    return (not is_guru(p3[4]) and is_guru(p3[5]) and is_guru(p4[4]) and is_guru(p4[5]))
 
-# ===== Визуализация: динамическая сетка с випулами =====
+def detect_padayadi_yamaka(block: List[str]) -> bool:
+    # одинаковые первые слоги всех 4 pāда
+    if len(block) < 32: return False
+    pads = [block[i*8:(i+1)*8] for i in range(4)]
+    heads = [p[0] for p in pads]
+    return len(set(heads)) == 1
+
+def detect_padaanta_yamaka(block: List[str]) -> bool:
+    # одинаковые последние слоги всех 4 pāda
+    if len(block) < 32: return False
+    pads = [block[i*8:(i+1)*8] for i in range(4)]
+    tails = [p[-1] for p in pads]
+    return len(set(tails)) == 1
+
+def detect_vrttyanuprasa(line: List[str]) -> bool:
+    # повтор одинакового согласного начала у слогов 5-7 в строке
+    if len(line) < 7: return False
+    onsets = []
+    for syl in line[4:7]:
+        m = re.match(r'^([^aAiIuUfFxXeEoO]+)', syl)
+        onsets.append(m.group(1) if m else '')
+    return len(set(onsets)) == 1 and onsets[0] != ''
+
+# ===== Визуализация: сетка с детекторами =====
 def visualize_lines(lines: List[List[str]]) -> None:
-    """Рисует сетку: строки подряд, слоги в квадратах, подсветка випулы"""
-    # вычисляем размер
     rows = len(lines)
-    cols = max((len(row) for row in lines), default=0)
-    # готовим отображение IAST
+    cols = max((len(r) for r in lines), default=0)
     display = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in row] for row in lines]
+    # сфорим 32-силлаб блоки для śloka детекций
+    all_sylls = [s for row in lines for s in row]
 
-    fig_w = max(cols, 1) / 8 * 6
-    fig_h = max(rows, 1) / 8 * 6
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), constrained_layout=True)
-    ax.set_xlim(0, cols)
-    ax.set_ylim(0, rows)
-    ax.axis('off')
-    ax.set_aspect('equal')
-
-    fs = 12
-    # базовая отрисовка guru/laghu
-    for r, row in enumerate(lines):
-        for c, syl in enumerate(row):
-            y = rows - 1 - r
-            face = 'black' if is_guru(syl) else 'white'
-            txt_color = 'white' if is_guru(syl) else 'black'
-            ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='black'))
-            ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=txt_color, fontsize=fs)
-    # подсветка випул по строкам
-    for r, row in enumerate(lines):
-        vip = identify_vipula(row)
-        if vip:
-            y = rows - 1 - r
-            for c in range(4):
-                if c < len(row):
-                    ax.add_patch(Rectangle((c, y), 1, 1, facecolor=vipula_colors[vip], alpha=0.4))
-    # легенда
-    legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu')]
-    for name, col in vipula_colors.items():
-        legend.append(Patch(facecolor=col, alpha=0.4, label=name))
-    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=8)
+    fig, ax = plt.subplots(figsize=(cols/8*6, rows/8*6), constrained_layout=True)
+    ax.set_xlim(0, cols); ax.set_ylim(0, rows)
+    ax.axis('off'); ax.set_aspect('equal')
+    fs=12
+    # базовая guru/laghu + текст
+    for r,row in enumerate(lines):
+        for c,syl in enumerate(row):
+            y=rows-1-r; face=('black' if is_guru(syl) else 'white'); tc=('white' if is_guru(syl) else 'black')
+            ax.add_patch(Rectangle((c,y),1,1,facecolor=face,edgecolor='gray'))
+            ax.text(c+0.5,y+0.5,display[r][c],ha='center',va='center',color=tc,fontsize=fs)
+    # detect and highlight śloka-level patterns
+    for start in range(0,len(all_sylls),32):
+        block=all_sylls[start:start+32]
+        if len(block)==32 and classify_pathya(block):
+            # draw border around 2 rows of this śloka
+            base_row = (start//cols)
+            h=2; w=8
+            ax.add_patch(Rectangle((0,rows-base_row-h),w,h,fill=False,edgecolor='blue',linewidth=2))
+        if len(block)==32 and detect_padayadi_yamaka(block):
+            base=(start//cols)
+            ax.add_patch(Rectangle((0,rows-base-h),w,h,fill=False,edgecolor='green',linestyle='--',linewidth=2))
+        if len(block)==32 and detect_padaanta_yamaka(block):
+            base=(start//cols)
+            ax.add_patch(Rectangle((0,rows-base-h),w,h,fill=False,edgecolor='red',linestyle=':',linewidth=2))
+    # line-level anupraśa
+    for r,row in enumerate(lines):
+        if detect_vrttyanuprasa(row):
+            y=rows-1-r
+            ax.add_patch(Rectangle((0,y),len(row),1,fill=False,edgecolor='purple',linewidth=2))
+    # legend
+    legend=[Patch(facecolor='black',label='Guru'),Patch(facecolor='white',label='Laghu'),
+            Patch(edgecolor='blue',fill=False,label='Pathya'),Patch(edgecolor='green',linestyle='--',fill=False,label='Pāda-ādi Yamaka'),
+            Patch(edgecolor='red',linestyle=':',fill=False,label='Pāda-anta Yamaka'),Patch(edgecolor='purple',fill=False,label='Vṛtti Anuprāsa')]
+    ax.legend(handles=legend,loc='lower center',bbox_to_anchor=(0.5,-0.1),ncol=3,fontsize=8)
     st.pyplot(fig)
 
 # ===== UI =====
-st.title("Sloka Meter Visualizer")
-text = st.text_area("Введите IAST-текст, разделяя строки знаком danda (। или ॥):", height=200)
-if st.button("Показать сетку"):
-    if not text.strip():
-        st.warning("Введите текст до danda!")
+st.title('Sloka Meter Visualizer')
+text=st.text_area('Введите IAST-текст, разделяя строки знаком danda (। или ॥):',height=200)
+if st.button('Показать сетку'):
+    if not text.strip(): st.warning('Введите текст до danda!')
     else:
-        parts = [p.strip() for p in re.split(r'[।॥]+', text) if p.strip()]
-        lines = [split_syllables_slp1(normalize(p)) for p in parts]
+        parts=[p.strip() for p in re.split(r'[।॥]+',text) if p.strip()]
+        lines=[split_syllables_slp1(normalize(p)) for p in parts]
         visualize_lines(lines)
