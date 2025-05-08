@@ -85,43 +85,56 @@ def visualize_lines(lines: List[List[str]]) -> None:
     rows = len(lines)
     cols = max((len(r) for r in lines), default=0)
     display = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in row] for row in lines]
-    # сфорим 32-силлаб блоки для śloka детекций
     all_sylls = [s for row in lines for s in row]
 
     fig, ax = plt.subplots(figsize=(cols/8*6, rows/8*6), constrained_layout=True)
-    ax.set_xlim(0, cols); ax.set_ylim(0, rows)
-    ax.axis('off'); ax.set_aspect('equal')
-    fs=12
-    # базовая guru/laghu + текст
-    for r,row in enumerate(lines):
-        for c,syl in enumerate(row):
-            y=rows-1-r; face=('black' if is_guru(syl) else 'white'); tc=('white' if is_guru(syl) else 'black')
-            ax.add_patch(Rectangle((c,y),1,1,facecolor=face,edgecolor='gray'))
-            ax.text(c+0.5,y+0.5,display[r][c],ha='center',va='center',color=tc,fontsize=fs)
-    # detect and highlight śloka-level patterns
-    for start in range(0,len(all_sylls),32):
-        block=all_sylls[start:start+32]
-        if len(block)==32 and classify_pathya(block):
-            # draw border around 2 rows of this śloka
-            base_row = (start//cols)
-            h=2; w=8
-            ax.add_patch(Rectangle((0,rows-base_row-h),w,h,fill=False,edgecolor='blue',linewidth=2))
-        if len(block)==32 and detect_padayadi_yamaka(block):
-            base=(start//cols)
-            ax.add_patch(Rectangle((0,rows-base-h),w,h,fill=False,edgecolor='green',linestyle='--',linewidth=2))
-        if len(block)==32 and detect_padaanta_yamaka(block):
-            base=(start//cols)
-            ax.add_patch(Rectangle((0,rows-base-h),w,h,fill=False,edgecolor='red',linestyle=':',linewidth=2))
-    # line-level anupraśa
-    for r,row in enumerate(lines):
+    ax.set_xlim(0, cols)
+    ax.set_ylim(0, rows)
+    ax.axis('off')
+    ax.set_aspect('equal')
+    fs = 12
+
+    # базовая отрисовка guru/laghu и текста
+    for r, row in enumerate(lines):
+        for c, syl in enumerate(row):
+            y = rows - 1 - r
+            face = 'black' if is_guru(syl) else 'white'
+            tc = 'white' if is_guru(syl) else 'black'
+            ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='gray', zorder=1))
+            ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=tc, fontsize=fs, zorder=2)
+
+    # подсветка śloka-level (pathya, yamaka)
+    for start in range(0, len(all_sylls), 32):
+        block = all_sylls[start:start+32]
+        sloka_row = start // cols
+        y0 = rows - sloka_row - 2  # верхняя строка śloka
+        # pathya anuṣṭubh
+        if len(block) == 32 and classify_pathya(block):
+            ax.add_patch(Rectangle((0, y0), 8, 2, fill=False, edgecolor='blue', linewidth=3, zorder=3))
+        # pāda-ādi yamaka
+        if len(block) == 32 and detect_padayadi_yamaka(block):
+            ax.add_patch(Rectangle((0, y0), 8, 2, fill=False, edgecolor='green', linestyle='--', linewidth=3, zorder=4))
+        # pāda-anta yamaka
+        if len(block) == 32 and detect_padaanta_yamaka(block):
+            ax.add_patch(Rectangle((0, y0), 8, 2, fill=False, edgecolor='red', linestyle=':', linewidth=3, zorder=5))
+
+    # line-level anuprāsa
+    for r, row in enumerate(lines):
         if detect_vrttyanuprasa(row):
-            y=rows-1-r
-            ax.add_patch(Rectangle((0,y),len(row),1,fill=False,edgecolor='purple',linewidth=2))
-    # legend
-    legend=[Patch(facecolor='black',label='Guru'),Patch(facecolor='white',label='Laghu'),
-            Patch(edgecolor='blue',fill=False,label='Pathya'),Patch(edgecolor='green',linestyle='--',fill=False,label='Pāda-ādi Yamaka'),
-            Patch(edgecolor='red',linestyle=':',fill=False,label='Pāda-anta Yamaka'),Patch(edgecolor='purple',fill=False,label='Vṛtti Anuprāsa')]
-    ax.legend(handles=legend,loc='lower center',bbox_to_anchor=(0.5,-0.1),ncol=3,fontsize=8)
+            y = rows - 1 - r
+            ax.add_patch(Rectangle((0, y), len(row), 1, fill=False, edgecolor='purple', linewidth=3, zorder=6))
+
+    # легенда
+    legend = [
+        Patch(facecolor='black', label='Guru'),
+        Patch(facecolor='white', label='Laghu'),
+        Patch(edgecolor='blue', fill=False, label='Pathya Anuṣṭubh'),
+        Patch(edgecolor='green', linestyle='--', fill=False, label='Pāda-ādi Yamaka'),
+        Patch(edgecolor='red', linestyle=':', fill=False, label='Pāda-anta Yamaka'),
+        Patch(edgecolor='purple', fill=False, label='Vṛtti Anuprāsa')
+    ]
+    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=8, frameon=False)
+
     st.pyplot(fig)
 
 # ===== UI =====
