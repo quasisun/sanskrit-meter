@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Patch
 import re
 import unicodedata
+import math
 from indic_transliteration import sanscript
 from indic_transliteration.sanscript import transliterate
-import math
 
 # ===== Конфигурация =====
 short_vowels = ['a', 'i', 'u', 'f', 'x']
@@ -61,22 +61,17 @@ def classify_pathya(syllables: list[str]) -> bool:
             and is_guru_syllable_slp1(p4[4])
             and is_guru_syllable_slp1(p4[5]))
 
-# ===== Визуализация сетки (с IAST-слогами) =====
+# ===== Визуализация сетки =====
 def visualize_grid(syllables: list[str], columns: int) -> None:
-    # IAST для отображения
     display = [transliterate(s, sanscript.SLP1, sanscript.IAST) for s in syllables]
     total = len(syllables)
     rows = math.ceil(total / columns)
 
-    # Вычисляем число слогов в каждой строке без пустышек
-    row_lengths = []
-    for r in range(rows):
-        start = r * columns
-        end = min(start + columns, total)
-        row_lengths.append(end - start)
+    # Вычисляем реальные длины строк
+    row_lengths = [(min((r+1)*columns, total) - r*columns) for r in range(rows)]
     max_len = max(row_lengths) if row_lengths else 0
 
-    # Размер фигуры пропорционально максимальной длине строки
+    # Размер фигуры
     fig_width = max_len / 8 * 6
     fig_height = rows / 8 * 6
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
@@ -85,14 +80,14 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
     ax.axis('off')
     ax.set_aspect('equal')
 
-    # Постоянный размер шрифта для читаемости
+    # Шрифт
     fs = 12
 
-    # Рисуем клетки и слоги по реальному числу в строках
+    # Отрисовка клеток и слогов
     for idx, syl in enumerate(syllables):
         col = idx % columns
         row = rows - 1 - (idx // columns)
-        # если за пределом реальной длины для этой строки, пропускаем
+        # пропускать выравнивающие клеткит
         if col >= row_lengths[rows - 1 - row]:
             continue
         disp = display[idx]
@@ -102,30 +97,34 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
         ax.add_patch(Rectangle((col, row), 1, 1, facecolor=face, edgecolor='black'))
         ax.text(col + 0.5, row + 0.5, disp, ha='center', va='center', color=txt_color, fontsize=fs)
 
-    # VIPULA и Pathyā (как раньше)
+    # Отметка випул для каждого śloka (32 слога)
     for start in range(0, total, 32):
-        if start + 32 > total: break
+        if start + 32 > total:
+            break
         block = syllables[start:start + 32]
-        v1, v2 = identify_vipula(block[0:4]), identify_vipula(block[16:20])
+        v1 = identify_vipula(block[0:4])
+        v2 = identify_vipula(block[16:20])
         for idx_v, vip in enumerate((v1, v2)):
             if vip in vipula_colors:
                 rel_row = 0 if idx_v == 0 else 2
                 abs_idx = start + rel_row * columns
-                row = rows - 1 - (abs_idx // columns)
+                r = rows - 1 - (abs_idx // columns)
                 for j in range(4):
-                    col = (start + j) % columns
-                    if col < row_lengths[rows - 1 - row]:
-                        ax.add_patch(Rectangle((col, row), 1, 1,
-                                                facecolor=vipula_colors[vip], alpha=0.65))
+                    c = (start + j) % columns
+                    if c < row_lengths[rows - 1 - r]:
+                        ax.add_patch(Rectangle((c, r), 1, 1, facecolor=vipula_colors[vip], alpha=0.65))
 
-    # Заголовок и легенда
+    # Заголовок
     title = f"{max_len}×{rows} Grid"
-    if classify_pathya(syllables): title += " — Pathyā-anuṣṭubh"
+    if classify_pathya(syllables):
+        title += " — Pathyā-anuṣṭubh"
     ax.set_title(title, fontsize=10)
 
+    # Легенда
     legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu'),
               Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā')]
-    for name, colc in vipula_colors.items(): legend.append(Patch(facecolor=colc, alpha=0.65, label=name))
+    for name, colc in vipula_colors.items():
+        legend.append(Patch(facecolor=colc, alpha=0.65, label=name))
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=4, fontsize=8)
     st.pyplot(fig)
 
@@ -133,10 +132,16 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
 st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Pathyā)")
 text = st.text_area("Введите шлоки на IAST:", height=200)
 columns = st.selectbox("Число слогов в строке:", [8, 16, 32], index=0)
+mode = 'flexible'  # гибкий режим
 if st.button("Показать"):
     if text:
         s = normalize(text)
-        syl = split_syllables_slp1(s)
-        visualize_grid(syl, columns)
+        # разбиваем на стихи по точкам-стопам
+        raw_blocks = re.split(r'[।॥]+', s)
+        verse_blocks = [b.strip() for b in raw_blocks if b.strip()]
+        for i, block in enumerate(verse_blocks, 1):
+            syl = split_syllables_slp1(block)
+            st.subheader(f"Стих {i} — {len(syl)} слогов")
+            visualize_grid(syl, columns)
     else:
         st.warning("Введите текст IAST")
