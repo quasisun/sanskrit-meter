@@ -15,49 +15,44 @@ def normalize(text: str) -> str:
 
 # ===== Сегментация на слоги SLP1 =====
 def split_syllables_slp1(text: str) -> list[str]:
-    \"\"\"
-    Классическое деление на слоги:
-    - В каждом слоге ровно один гласный.
-    - Предгласные согласные (onset) остаются перед ним.
-    - Согласные после гласного: если их ≥2, первая идёт в coda, остальные в следующий слог; если 1 — в следующий слог.
-    - M и H (anusvāra/visarga) всегда в coda.
-    \"\"\"
-    # Убираем пробелы
-    s = re.sub(r\"\\s+\", \"\", text)
+    # Убираем все пробельные символы, чтобы слоги не терялись на границах слов
+    s = re.sub(r"\s+", "", text)
     vowels = set('aAiIuUfFxXeEoO')
     n = len(s)
-    sylls = []
+    sylls: list[str] = []
     pos = 0
     while pos < n:
-        # найти следующий гласный
+        # ищем следующий гласный
         j = pos
         while j < n and s[j] not in vowels:
             j += 1
         if j >= n:
             break
-        # onset + nucleus
-        onset = pos
+        # nucleus найден в j; включаем опциональный M/H
         k = j + 1
-        # включаем M/H
         if k < n and s[k] in ('M', 'H'):
             k += 1
-        # кластер после гласного
+        # собираем кластер после гласного
         cstart = k
         while k < n and s[k] not in vowels:
             k += 1
         cluster = s[cstart:k]
-        # разбиваем кластер
-        cut = cstart if len(cluster) <= 1 else cstart + 1
-        sylls.append(s[onset:cut])
-        pos = cut
-    # остаток в последний слог
-    if pos < n:
-        if sylls:
-            sylls[-1] += s[pos:]
+        # решаем, сколько символов кластер остаётся в слоге
+        if len(cluster) <= 1:
+            cut = k
         else:
-            sylls = [s]
+            cut = cstart + 1
+        # добавляем слог
+        sylls.append(s[pos:cut])
+        pos = cut
+    # остаток (если есть) добавляем к последнему слогу
+    if pos < n:
+        rem = s[pos:]
+        if sylls:
+            sylls[-1] += rem
+        else:
+            sylls = [rem]
     return sylls
-
 
 # ===== Определение гуру/лакху =====
 short_vowels = ['a', 'i', 'u', 'f', 'x']
