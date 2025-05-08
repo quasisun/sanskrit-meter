@@ -1,148 +1,243 @@
 import streamlit as st
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle, Patch, Circle
-import re
-from indic_transliteration import sanscript
-from indic_transliteration.sanscript import transliterate
+from matplotlib.patches import Rectangle, Circle, Patch
+import re, unicodedata
+from collections import Counter
 
-# ===== Настройки цветов =====
-vipula_colors = {
-    'Nagari': '#FF7F00',
-    'Bhavani': '#1E3F66',
-    'Shardula': '#2E8B57',
-    'Arya': '#8B0000',
-    'Vidyunmala': '#9932CC'
-}
-pathya_color = '#4682B4'  # для подсветки Pathyā-anuṣṭubh
+# --- УТИЛИТЫ ---
+def normalize_iast(text):
+    # Убираем данды и цифры, нормализуем Unicode
+    text = re.sub(r'[।॥\d]', '', text)
+    return unicodedata.normalize('NFC', text).strip()
 
-def normalize(text):
-    """Конвертация IAST → SLP1"""
-    return transliterate(text.strip(), sanscript.IAST, sanscript.SLP1)
+def split_syllables(text):
+    # Упрощённое, но надёжное разбиение на санскритские слоги в IAST
+    # (начальные согласные) + гласная+ возможный знак + одна согл.
+    text = re.sub(r'\s+', '', text)
+    pat = r'([^aeiouāīūṛṝeoau]*[aeiouāīūṛṝeoau]+(?:ṃ|ḥ)?(?:[kgṅcjñṭḍṇtdnpbmyrlvśṣsh](?!h))?)'
+    return [s for s in re.findall(pat, text) if s]
 
-def split_syllables_slp1(text):
-    pattern = r"""
-        ([^aAiIuUfFxXeEoOMH]*
-         [aAiIuUfFxXeEoO]
-         [MH]?
-         [^aAiIuUfFxXeEoOMH]?)
-    """
-    return [s for s in re.findall(pattern, text, re.VERBOSE) if s]
-
-def is_guru_syllable_slp1(syl):
-    m = re.match(r"^([^aAiIuUfFxXeEoOMH]*)([aAiIuUfFxXeEoO])([MH]?)(.*)$", syl)
+def is_guru(syl):
+    # Нормализованный слог без пробелов
+    m = re.match(r'^([^aeiouāīūṛṝeoau]*)([aeiouāīūṛṝeoau]+)(ṃ|ḥ)?(.*)$', syl)
     if not m:
         return False
     _, vowel, nasal, after = m.groups()
-    if vowel in ['A','I','U','F','X','e','E','o','O']:
+    long_v = set(['ā','ī','ū','ṝ','e','ai','o','au'])
+    # долгий гласный
+    if vowel in long_v:
         return True
+    # анусвара/висарга
     if nasal:
         return True
-    if len(after) >= 2:
+    # кластер из ≥2 согл. после краткого гласного
+    if re.match(r'^[^aeiouāīūṛṝeoau]{2,}', after):
         return True
     return False
 
-def identify_vipula(first4):
-    pattern = ''.join('g' if is_guru_syllable_slp1(s) else 'l' for s in first4)
-    mapping = {'lglg':'Nagari','lllg':'Bhavani','llgg':'Shardula','glgg':'Arya','gglg':'Vidyunmala'}
-    return mapping.get(pattern)
+def identify_vipula(half):
+    # Первая половина śloka: список из 16 слогов
+    seq = ''.join('g' if is_guru(s) else 'l' for s in half[:4])
+    return {
+        'lglg':'Nāgarī',
+        'lllg':'Bhavānī',
+        'llgg':'Śārdūla',
+        'glgg':'Āryā',
+        'gglg':'Vidyunmālā',
+    }.get(seq, None)
 
 def classify_anushtubh(syllables):
+    # Только для 32-слоговой śloka
     if len(syllables) < 32:
-        return False
-    p3, p4 = syllables[16:24], syllables[24:32]
-    if len(p3)<6 or len(p4)<6:
-        return False
-    l3_5 = is_guru_syllable_slp1(p3[4]); l3_6 = is_guru_syllable_slp1(p3[5])
-    l4_5 = is_guru_syllable_slp1(p4[4]); l4_6 = is_guru_syllable_slp1(p4[5])
-    return (not l3_5) and l3_6 and l4_5 and l4_6
+        return None
+    p3 = syllables[16:24]
+    p4 = syllables[24:32]
+    # 3-я pada: 5-й laghu, 6-й guru
+    cond3 = (not is_guru(p3[4])) and is_guru(p3[5])
+    # 4-я pada: 5-й и 6-й guru
+    cond4 = is_guru(p4[4]) and is_guru(p4[5])
+    return 'Pathyā-anuṣṭubh' if (cond3 and cond4) else None
 
-def detect_anuprasa(line):
-    initials = [re.match(r'[^\W\d_]*',s).group(0) for s in line]
-    return {s for s in initials if initials.count(s)>1}
+# --- Anuprāsa TYPES ---
+def get_initial(syl):
+    m = re.match(r'[^aeiouāīūṛṝeoau]+', syl)
+    return m.group(0) if m else ''
 
-def detect_sloka_yamaka(syllables):
-    marks=[]
-    if len(syllables)>=32:
-        p1, p2 = syllables[0:8], syllables[8:16]
-        p3, p4 = syllables[16:24], syllables[24:32]
-        for i in range(8):
-            if p1[i]==p3[i]: marks.append((0,i)); marks.append((2,i))
-            if p2[i]==p4[i]: marks.append((1,i)); marks.append((3,i))
-    return marks
+def get_final(syl):
+    m = re.search(r'[^aeiouāīūṛṝeoau]+$', syl)
+    return m.group(0) if m else ''
 
-def visualize_grid(slp1_sylls, iast_sylls, line_len, vipula_sel, show_pathya, show_anuprasa, show_yamaka):
-    fig,ax=plt.subplots(figsize=(6,6))
-    ax.set_xlim(0,line_len); ax.set_ylim(0,line_len)
-    ax.set_xticks([]); ax.set_yticks([]); ax.set_aspect('equal')
+def detect_lata(block):
+    # lāṭānuprāsa: все initial в śloka одинаковы
+    inits = [get_initial(s) for s in block[:32]]
+    inits = [i for i in inits if i]
+    return len(inits)>0 and len(set(inits))==1
 
-    # Guru/Laghu
-    rows=[slp1_sylls[i:i+line_len] for i in range(0,len(slp1_sylls),line_len)]
-    for i in range(line_len):
-        row=rows[i] if i<len(rows) else []
-        for j in range(line_len):
-            col='black' if j<len(row) and is_guru_syllable_slp1(row[j]) else 'white'
-            ax.add_patch(Rectangle((j,line_len-1-i),1,1,facecolor=col,edgecolor='black'))
+def detect_cheka(block):
+    # chekānuprāsa: одинаковое initial в каждой pada
+    inits = []
+    for k in (0,8,16,24):
+        pad = [get_initial(s) for s in block[k:k+8]]
+        pad = [i for i in pad if i]
+        if not pad:
+            return False
+        inits.append(pad[0])
+    return len(set(inits))==1
 
-    # Vipula
-    for sh in range(0,len(slp1_sylls),32):
-        if sh+32<=len(slp1_sylls):
-            vip1=identify_vipula(slp1_sylls[sh:sh+4]); vip2=identify_vipula(slp1_sylls[sh+16:sh+20])
-            for idx,vip in enumerate((vip1,vip2)):
-                if vip and vip in vipula_sel:
-                    row=line_len-1-(sh//line_len) - idx*2
-                    for j in range(min(4,line_len)):
-                        ax.add_patch(Rectangle((j,row),1,1,facecolor=vipula_colors[vip],alpha=0.5))
+def detect_vrtty(block):
+    # vṛttyānuprāsa: initial первых 16 слогов повторяется минимум 3 раза
+    inits = [get_initial(s) for s in block[:16] if get_initial(s)]
+    cnt = Counter(inits)
+    return any(c>=3 for c in cnt.values())
 
-    # Pathyā highlight
-    if show_pathya and classify_anushtubh(slp1_sylls):
-        ax.add_patch(Rectangle((0,0),line_len,line_len,fill=False,edgecolor=pathya_color,linewidth=3))
+def detect_antya_pada(block):
+    # antyānuprāsa pada: в каком-то pada все final одинаковы
+    for k in (0,8,16,24):
+        finals = [get_final(s) for s in block[k:k+8] if get_final(s)]
+        if finals and len(set(finals))==1:
+            return True
+    return False
 
-    # Anuprāsa
-    if show_anuprasa:
-        for i,row in enumerate(rows):
-            reps=detect_anuprasa(row)
-            for j,s in enumerate(row):
-                init=re.match(r'[^\W\d_]*',s).group(0)
-                if init in reps:
-                    ax.add_patch(Rectangle((j,line_len-1-i),1,1,fill=False,edgecolor='blue',linewidth=2))
+def detect_antya_sloka(block):
+    # antyānuprāsa śloka: все final в śloka одинаковы
+    finals = [get_final(s) for s in block[:32] if get_final(s)]
+    return finals and len(set(finals))==1
 
-    # Yamaka
-    if show_yamaka:
-        for i,j in detect_sloka_yamaka(slp1_sylls):
-            ax.add_patch(Circle((j+0.5,line_len-1-i+0.5),0.15,color='purple'))
+def detect_srtya_dantya(block):
+    # śṛtyānuprāsa dantya: final pada1 == initial pada2
+    if len(block)>=16:
+        f = get_final(block[7])
+        i = get_initial(block[8])
+        return f and i and (f==i)
+    return False
 
-    ax.set_title(f"{line_len}×{line_len} — Pathyā={show_pathya}",fontsize=10)
-    # Legend
-    legend=[Patch(facecolor='black',edgecolor='black',label='Guru'),Patch(facecolor='white',edgecolor='black',label='Laghu')]
-    for vip,col in vipula_colors.items():
-        if vip in vipula_sel: legend.append(Patch(facecolor=col,alpha=0.5,label=f'Vipula:{vip}'))
-    if show_pathya: legend.append(Patch(facecolor='none',edgecolor=pathya_color,linewidth=2,label='Pathyā'))
-    if show_anuprasa: legend.append(Patch(facecolor='none',edgecolor='blue',linewidth=2,label='Anuprāsa'))
-    if show_yamaka: legend.append(Patch(facecolor='purple',label='Yamaka',alpha=0.5))
-    ax.legend(handles=legend,loc='lower center',bbox_to_anchor=(0.5,-0.25),ncol=3,fontsize=8)
+# --- Sloka-Yamaka (зеркальное) ---
+def detect_yamaka(block):
+    pairs = set()
+    if len(block) < 32:
+        return pairs
+    p1 = block[0:8]; p2 = block[8:16]; p3 = block[16:24]; p4 = block[24:32]
+    for idx in range(8):
+        if p1[idx]==p3[idx]:
+            pairs.add((0,idx)); pairs.add((2,idx))
+        if p2[idx]==p4[idx]:
+            pairs.add((1,idx)); pairs.add((3,idx))
+    return pairs
+
+# --- Цвета ---
+VIP_COLORS = {
+    'Nāgarī':'#FFA500', 'Bhavānī':'#1E90FF', 'Śārdūla':'#32CD32',
+    'Āryā':'#FF4500','Vidyunmālā':'#9932CC'
+}
+ANU_COLORS = {
+    'lāṭānuprāsa':'#DAA520', 'chekānuprāsa':'#4682B4', 'vṛttyānuprāsa':'#32CD32',
+    'antyānuprāsa pada':'#FF4500','antyānuprāsa śloka':'#9932CC','śṛtyānuprāsa dantya':'#FF69B4'
+}
+
+# --- ПАНЕЛЬ УПРАВЛЕНИЯ ---
+st.sidebar.title("Настройки отображения")
+grid_size = st.sidebar.selectbox("Grid size (слогов в строке)", [8,16,32], index=0)
+show_pathya = st.sidebar.checkbox("Highlight Pathyā-anuṣṭubh", True)
+vipula_choices = st.sidebar.multiselect("Vipula to show", list(VIP_COLORS.keys()), default=list(VIP_COLORS.keys()))
+anuprasa_choices = st.sidebar.multiselect("Anuprāsa to show", list(ANU_COLORS.keys()), default=[])
+show_yam = st.sidebar.checkbox("Show Śloka-Yamaka", False)
+
+text = st.text_area("Вставьте IAST-текст шлок", height=200)
+if not text.strip():
+    st.warning("Пожалуйста, введите текст.")
+    st.stop()
+
+# --- Подготовка слогов и блоков ---
+txt = normalize_iast(text)
+sylls = split_syllables(txt)
+block_size = grid_size * grid_size
+blocks = [sylls[i:i+block_size] for i in range(0, len(sylls), block_size)]
+
+for bi, block in enumerate(blocks):
+    # Classification
+    vip_labels = []
+    if len(block) >= 32:
+        vip_labels = [identify_vipula(block[0:16]), identify_vipula(block[16:32])]
+    pathya = classify_anushtubh(block)
+
+    # Создаём фигуру
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.set_xticks([]); ax.set_yticks([]); ax.set_xlim(0, grid_size); ax.set_ylim(0, grid_size)
+    ax.set_aspect('equal')
+
+    # Если выделяем Pathyā-anuṣṭubh рамкой всего блока
+    if show_pathya and pathya=='Pathyā-anuṣṭubh':
+        ax.add_patch(Rectangle((0,0), grid_size, grid_size, fill=False, edgecolor='red', linewidth=3))
+
+    # Yamaka-позиции
+    yam_positions = detect_yamaka(block) if show_yam else set()
+
+    # Рисуем клетки
+    for i in range(grid_size):
+        for j in range(grid_size):
+            idx = i*grid_size + j
+            x, y = j, grid_size-1-i
+            syl = block[idx] if idx < len(block) else ''
+            guru = is_guru(syl)
+            face = 'black' if guru else 'white'
+            ax.add_patch(Rectangle((x,y),1,1,facecolor=face,edgecolor='gray'))
+
+            # текст слога
+            if syl:
+                color = 'white' if guru else 'black'
+                ax.text(x+0.5, y+0.5, syl, ha='center', va='center', color=color, fontsize=8)
+
+    # Наложение Vipula (поверх)
+    # Випулы первые 4 ячейки каждой половины śloka (только для grid_size>=8)
+    if grid_size>=8:
+        for half_index, label in enumerate(vip_labels):
+            if label and label in vipula_choices:
+                rows = [grid_size-1, grid_size-1-2] if half_index==0 else [grid_size-1-4, grid_size-1-6]
+                for r in rows:
+                    for c in range(4):
+                        ax.add_patch(Rectangle((c,r),1,1,facecolor=VIP_COLORS[label],alpha=0.5))
+
+    # Наложение Anuprāsa
+    # Только для первой śloka в блоке
+    if block and any(anuprasa_choices):
+        for name, fn in [
+            ('lāṭānuprāsa', detect_lata),
+            ('chekānuprāsa', detect_cheka),
+            ('vṛttyānuprāsa', detect_vrtty),
+            ('antyānuprāsa pada', detect_antya_pada),
+            ('antyānuprāsa śloka', detect_antya_sloka),
+            ('śṛtyānuprāsa dantya', detect_srtya_dantya),
+        ]:
+            if name in anuprasa_choices and fn(block):
+                ax.add_patch(Rectangle((0,0),grid_size,grid_size,
+                                       facecolor=ANU_COLORS[name],alpha=0.4))
+
+    # Наложение Yamaka
+    for (pi, pj) in yam_positions:
+        # pi = pada index 0..3, pj = pos in pada 0..7
+        gi = pi*8 + pj
+        bx = pj; by = grid_size-1 - pi*8/ (grid_size/8) - int(pi*8/ (grid_size/8))
+        # simplify: for grid_size 8 use by=grid_size-1-pi
+        if grid_size==8:
+            by = grid_size-1 - pi
+        ax.add_patch(Circle((bx+0.8, by+0.2),0.1,color='purple'))
+
+    # Заголовок и легенда
+    ax.set_title(f"Block {bi+1} — {pathya or 'Non-Pathyā'}", fontsize=12)
+    legend_elems = [
+        Patch(facecolor='black',edgecolor='gray',label='Guru'),
+        Patch(facecolor='white',edgecolor='gray',label='Laghu')
+    ]
+    for label,color in VIP_COLORS.items():
+        if label in vipula_choices:
+            legend_elems.append(Patch(facecolor=color,alpha=0.5,label=f'Vipula {label}'))
+    for name,color in ANU_COLORS.items():
+        if name in anuprasa_choices:
+            legend_elems.append(Patch(facecolor=color,alpha=0.4,label=name))
+    if show_pathya:
+        legend_elems.append(Patch(facecolor='none',edgecolor='red',label='Pathyā-anuṣṭubh',linewidth=3))
+    if show_yam:
+        legend_elems.append(Patch(facecolor='purple',label='Yamaka'))
+    ax.legend(handles=legend_elems, bbox_to_anchor=(1.05,1), loc='upper left', borderaxespad=0.,fontsize=8)
+
     st.pyplot(fig)
-
-    # IAST под строками
-    rows_iast=[iast_sylls[i:i+line_len] for i in range(0,len(iast_sylls),line_len)]
-    for row in rows_iast:
-        st.write(' '.join(row))
-
-# ===== UI =====
-st.title('Shloka Visualizer')
-text=st.text_area('Введите шлоки в IAST',height=200)
-
-vipula_sel=st.multiselect('Выберите Vipula',options=list(vipula_colors.keys()),default=list(vipula_colors.keys()))
-show_pathya=st.checkbox('Подсветить Pathyā-anuṣṭubh',value=False)
-show_anuprasa=st.checkbox('Показать Anuprāsa',value=False)
-show_yamaka=st.checkbox('Показать Yamaka',value=False)
-line_len=st.selectbox('Слоги в строке',[8,16,32],index=0)
-
-if st.button('Визуализировать'):
-    if not text.strip(): st.warning('Введите текст')
-    else:
-        slp1=normalize(text)
-        slp1_syl=split_syllables_slp1(slp1)
-        iast_syl=[transliterate(s,sanscript.SLP1,sanscript.IAST) for s in slp1_syl]
-        for i in range(0,len(slp1_syl),line_len*line_len):
-            st.subheader(f'Блок {i//(line_len*line_len)+1}')
-            visualize_grid(slp1_syl[i:i+line_len*line_len],iast_syl[i:i+line_len*line_len],line_len,vipula_sel,show_pathya,show_anuprasa,show_yamaka)
