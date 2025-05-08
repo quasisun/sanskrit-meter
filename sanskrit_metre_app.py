@@ -95,7 +95,6 @@ def visualize_lines(lines: List[List[str]]):
     disp = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in r] for r in lines]
     flat = [s for r in lines for s in r]
 
-    # smaller figsize for tighter clusters
     fig, ax = plt.subplots(figsize=(cols * 0.55, rows * 0.55))
     ax.set(xlim=(0, cols), ylim=(0, rows)); ax.axis('off'); ax.set_aspect('equal')
 
@@ -116,7 +115,7 @@ def visualize_lines(lines: List[List[str]]):
         if detect_vrttyanuprasa(row):
             ax.add_patch(Rectangle((0, y), len(row), 1, fill=False, edgecolor='purple', lw=2, zorder=4))
 
-    # śloka‑level borders
+    # śloka-level borders
     for i in range(0, len(flat), 32):
         blk = flat[i:i + 32]
         if len(blk) < 32:
@@ -143,11 +142,9 @@ st.title('Sloka Meter Visualizer')
 
 st.markdown("**Quick instructions:** Paste IAST, one pāda per line separated by `|`, `।`, or `॥`. Click **Show**. Markers: vipulā (fill), yamaka / anuprāsa / pathyā (borders).")
 
-# Sidebar legend that scrolls with the page
+# Sidebar legend
 st.sidebar.header('Legend')
-legend_items = [
-    ('Guru', 'black', True), ('Laghu', 'white', True)
-]
+legend_items = [('Guru', 'black', True), ('Laghu', 'white', True)]
 for n, c in vipula_colors.items():
     legend_items.append((f'Vipula {n}', c, True))
 legend_items += [
@@ -157,8 +154,9 @@ legend_items += [
     ('Pāda‑anta Yamaka', 'red', False)
 ]
 for label, col, fill in legend_items:
-    box = f"<span style='display:inline-block;width:14px;height:14px;{"background:"+col if fill else "border:2px solid "+col}"'></span> {label}<br>"
-    st.sidebar.markdown(box, unsafe_allow_html=True)
+    style = f"background:{col};" if fill else f"border:2px solid {col};"
+    html = f"<span style='display:inline-block;width:14px;height:14px;{style}'></span> {label}<br>"
+    st.sidebar.markdown(html, unsafe_allow_html=True)
 
 text = st.text_area('IAST input:', height=200)
 if st.button('Show'):
@@ -166,7 +164,4 @@ if st.button('Show'):
     if not parts:
         st.error('No valid lines found.')
     else:
-        lines = [split_syllables_slp1(normalize(p)) for p in parts]
-        visualize_lines(lines)
-
-st.markdown("<div style='text-align:center; font-size:0.9em; margin-top:1em;'>App by Svetlana Kreuzer</div>", unsafe_allow_html=True)
+        lines = [split_syllables_slp1(normalize(p))
