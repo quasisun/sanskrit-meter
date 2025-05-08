@@ -62,98 +62,56 @@ def classify_pathya(syllables: list[str]) -> bool:
             and is_guru_syllable_slp1(p4[5]))
 
 # ===== Визуализация сетки =====
-def visualize_grid(syllables: list[str], columns: int) -> None:
+def visualize_grid(syllables: list[str]) -> None:
+    # IAST для отображения
     display = [transliterate(s, sanscript.SLP1, sanscript.IAST) for s in syllables]
     total = len(syllables)
-    rows = math.ceil(total / columns)
 
-    # Вычисляем реальные длины строк
-    row_lengths = [(min((r+1)*columns, total) - r*columns) for r in range(rows)]
-    max_len = max(row_lengths) if row_lengths else 0
+    # Жесткая ширина 9 для гибкого режима
+    columns = 9
+    # Две строки: две половины строки до/padaha
+    half = math.ceil(total / 2)
+    half_lengths = [half, total - half]
+    rows = 2
 
     # Размер фигуры
-    fig_width = max_len / 8 * 6
+    fig_width = columns / 8 * 6
     fig_height = rows / 8 * 6
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
-    ax.set_xlim(0, max_len)
+    ax.set_xlim(0, columns)
     ax.set_ylim(0, rows)
     ax.axis('off')
     ax.set_aspect('equal')
 
-    # Шрифт
+    # Размер шрифта
     fs = 12
 
-    # Отрисовка клеток и слогов
-    for idx, syl in enumerate(syllables):
-        col = idx % columns
-        row = rows - 1 - (idx // columns)
-        # пропускать выравнивающие клеткит
-        if col >= row_lengths[rows - 1 - row]:
-            continue
-        disp = display[idx]
-        guru = is_guru_syllable_slp1(syl)
-        face = 'black' if guru else 'white'
-        txt_color = 'white' if guru else 'black'
-        ax.add_patch(Rectangle((col, row), 1, 1, facecolor=face, edgecolor='black'))
-        ax.text(col + 0.5, row + 0.5, disp, ha='center', va='center', color=txt_color, fontsize=fs)
+    # Отрисовка половинок
+    for r in range(rows):
+        row_len = half_lengths[r]
+        for c in range(row_len):
+            idx = r * half + c if r == 1 else c
+            syl = syllables[idx]
+            disp = display[idx]
+            guru = is_guru_syllable_slp1(syl)
+            face = 'black' if guru else 'white'
+            txt_color = 'white' if guru else 'black'
+            y = rows - 1 - r
+            ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='black'))
+            ax.text(c + 0.5, y + 0.5, disp, ha='center', va='center', color=txt_color, fontsize=fs)
+    # Оставшиеся клетки пусты (нет слога)
+    # не рисуем их
 
-        # Отметка випул для каждого ślока (32 слога)
-    # Отметка випул для каждого śloka (32 слога)
-
-    if total >= 32:
-
-        for start in range(0, total, 32):
-
-            if start + 32 > total:
-
-                break
-
-            block = syllables[start:start + 32]
-
-            v1 = identify_vipula(block[0:4])
-
-            v2 = identify_vipula(block[16:20])
-
-            for idx_v, vip in enumerate((v1, v2)):
-
-                rel_row = 0 if idx_v == 0 else 2
-
-                if rel_row >= rows:
-
-                    continue
-
-                if vip in vipula_colors:
-
-                    abs_idx = start + rel_row * columns
-
-                    r = rows - 1 - (abs_idx // columns)
-
-                    if r < 0 or r >= rows:
-
-                        continue
-
-                    for j in range(4):
-
-                        c = (start + j) % columns
-
-                        if c < row_lengths[rows - 1 - r]:
-
-                            ax.add_patch(Rectangle((c, r), 1, 1,
-
-                                                    facecolor=vipula_colors[vip], alpha=0.65))
+    # VIPULA и Pathyā (для 32+)
+    # пропускаем: малый формат
 
     # Заголовок
-    title = f"{max_len}×{rows} Grid"
-    if classify_pathya(syllables):
-        title += " — Pathyā-anuṣṭubh"
+    title = f"{columns}×{rows} Grid (9×2)"
     ax.set_title(title, fontsize=10)
 
-    # Легенда
-    legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu'),
-              Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā')]
-    for name, colc in vipula_colors.items():
-        legend.append(Patch(facecolor=colc, alpha=0.65, label=name))
-    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=4, fontsize=8)
+    # Легенда (только Guru/Laghu)
+    legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu')]
+    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=2, fontsize=8)
     st.pyplot(fig)
 
 # ===== UI =====
