@@ -123,16 +123,20 @@ def visualize_grid(syllables: list[str], line_length: int) -> None:
     st.pyplot(fig)
 
 # ===== Streamlit UI =====
-st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Pathyā)")
-text = st.text_area("Введите шлоки на IAST (до 108 шлок):", height=200)
-size = st.selectbox("Слогов в строке:", [8, 16, 32], index=0)
-if st.button("Показать"):
-    if text:
-        s = normalize(text)
-        syl = split_syllables_slp1(s)
-        blocks = [syl[i:i+size*size] for i in range(0, len(syl), size*size)]
-        for i, b in enumerate(blocks[:108]):
-            st.subheader(f"Шлока {i+1}")
-            visualize_grid(b, size)
+st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Anuṣṭubh type + Alaṅkāra)")
+
+text_input = st.text_area("Введите шлоки в IAST:", height=200)
+
+grid_size = st.selectbox("Размер сетки (по слогам в строке):", options=[8, 16, 32], index=0)
+
+if st.button("Визуализировать"):
+    if text_input.strip():
+        slp1_text = normalize(text_input)
+        syllables = split_syllables_slp1(slp1_text)
+        block_size = grid_size * grid_size
+        blocks = [syllables[i:i + block_size] for i in range(0, len(syllables), block_size)]
+        for i, block in enumerate(blocks):
+            st.subheader(f"Блок {i+1}")
+            visualize_grid(block, grid_size)
     else:
-        st.warning("Введите текст IAST")
+        st.warning("Пожалуйста, введите текст.")
