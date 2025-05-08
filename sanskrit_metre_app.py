@@ -172,11 +172,40 @@ def visualize_lines(lines: List[List[str]]) -> None:
         if detect_padaanta_yamaka(block):
             ax.add_patch(Rectangle((0, y_bottom), w, 2, fill=False, edgecolor='red', linestyle=':', linewidth=2, zorder=4))
 
-    # 4. легенда сбоку
-    legend_patches = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu')]
-    legend_patches += [Patch(edgecolor=col, facecolor='none', linewidth=2.5, label=f'Vipula {name}')
-                       for name, col in vipula_colors.items()]
-    legend_patches += [Patch(edgecolor='purple', facecolor='none', linewidth=2, label='Vṛtti Anuprāsa'),
-                       Patch(edgecolor='blue', facecolor='none', linewidth=2.5, label='Pathya'),
-                       Patch(edgecolor='green', facecolor='none', linestyle='--', linewidth=2, label='Pāda-adi Yamaka'),
-                       Patch(edgecolor='red', facecolor
+        # 4. легенда сбоку
+    legend_patches = [
+        Patch(facecolor='black', label='Guru'),
+        Patch(facecolor='white', label='Laghu'),
+    ]
+    # Vipula
+    for name, col in vipula_colors.items():
+        legend_patches.append(Patch(edgecolor=col, facecolor='none', linewidth=2.5, label=f'Vipula {name}'))
+    # Арупраса и ямаки
+    legend_patches.extend([
+        Patch(edgecolor='purple', facecolor='none', linewidth=2, label='Vṛtti Anuprāsa'),
+        Patch(edgecolor='blue', facecolor='none', linewidth=2.5, label='Pathya Anuṣṭubh'),
+        Patch(edgecolor='green', facecolor='none', linestyle='--', linewidth=2, label='Pāda-ādi Yamaka'),
+        Patch(edgecolor='red', facecolor='none', linestyle=':', linewidth=2, label='Pāda-anta Yamaka')
+    ])
+
+    # Размещаем легенду справа от сетки
+    ax.legend(handles=legend_patches, loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize=10)
+
+    st.pyplot(fig)
+    plt.close(fig)
+
+# ===== UI =====
+
+st.title('Sloka Meter Visualizer')
+text = st.text_area('Введите IAST-текст, разделяя строки знаком danda (। или ॥):', height=200)
+
+if st.button('Показать сетку'):
+    if not text.strip():
+        st.warning('Введите текст!')
+    else:
+        parts = [p.strip() for p in re.split(r'[।॥]+', text) if p.strip()]
+        if not parts:
+            st.error('Не удалось разделить текст на строки!')
+        else:
+            lines = [split_syllables_slp1(normalize(p)) for p in parts]
+            visualize_lines(lines)
