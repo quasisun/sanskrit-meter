@@ -142,12 +142,7 @@ def visualize_grid(syllables, line_length):
         Patch(facecolor=vipula_colors['Vidyunmala'], alpha=0.65, label='Vipula: Vidyunmala'),
         Patch(facecolor=anushtubh_colors['Pathyā-anuṣṭubh'], alpha=0.5, label='Type: Pathyā-anuṣṭubh')
     ]
-    for name, color in vipula_colors.items():
-        legend_elements.append(Patch(facecolor=color, alpha=0.65, label=f'Vipula: {name}'))
-    for name, color in anushtubh_colors.items():
-        legend_elements.append(Patch(facecolor=color, alpha=0.5, label=f'Type: {name}'))
-
-    ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.4), ncol=2, fontsize=8)
+    ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.4), ncol=2, fontsize=8)(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.4), ncol=2, fontsize=8)
     st.pyplot(fig)
 
 # ===== Streamlit UI =====
