@@ -45,29 +45,46 @@ def is_guru(s: str) -> bool:
 def visualize_lines(lines: list[list[str]]) -> None:
     # перевод в IAST для показа
     display = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in row] for row in lines]
-    rows = len(lines)
-    cols = max(len(row) for row in lines) if rows>0 else 0
+    # оригинальное число строк и столбцов
+    orig_rows = len(lines)
+    cols = max((len(row) for row in lines), default=0)
 
+    # фиксированная высота в 16 строк для квадратных клеток
+    grid_rows = 16
+    # при необходимости добавляем пустые строки сверху
+    pad_rows = max(0, grid_rows - orig_rows)
+    padded_lines = [[] for _ in range(pad_rows)] + lines
+    padded_display = [['' for _ in range(cols)] for __ in range(pad_rows)] + display
+
+    # размеры фигуры пропорциональны cols x grid_rows
     fig_w = max(cols, 1) / 8 * 6
-    fig_h = max(rows,1) / 8 * 6
+    fig_h = grid_rows / 8 * 6
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), constrained_layout=True)
     ax.set_xlim(0, cols)
-    ax.set_ylim(0, rows)
+    ax.set_ylim(0, grid_rows)
     ax.axis('off')
     ax.set_aspect('equal')
 
     fs = 12
-    for r, row in enumerate(lines):
-        for c, syl in enumerate(row):
-            y = rows - 1 - r
-            face = 'black' if is_guru(syl) else 'white'
-            txt_color = 'white' if is_guru(syl) else 'black'
+    # отрисовка клеток и текста
+    for r, row in enumerate(padded_lines):
+        for c in range(cols):
+            syl = row[c] if c < len(row) else ''
+            y = grid_rows - 1 - r
+            if syl:
+                face = 'black' if is_guru(syl) else 'white'
+                txt_color = 'white' if is_guru(syl) else 'black'
+            else:
+                face = 'white'
+                txt_color = 'none'
             ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='black'))
-            ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=txt_color, fontsize=fs)
+            if syl:
+                ax.text(c + 0.5, y + 0.5, padded_display[r][c], ha='center', va='center', color=txt_color, fontsize=fs)
 
+    # легенда
     legend = [Patch(facecolor='black', label='guru'), Patch(facecolor='white', label='laghu')]
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=2, fontsize=8)
-    st.pyplot(fig)
+    st.pyplot(fig)(fig)
 
 # ===== UI =====
 st.title("Sloka Meter Visualizer")
