@@ -25,7 +25,7 @@ opt_vikranta = st.sidebar.checkbox("Vikrānta Yamaka", False)
 st.sidebar.markdown("### Sanskrit terms (IAST)")
 st.sidebar.markdown("- laghu: light syllable")
 st.sidebar.markdown("- guru: heavy syllable")
-st.sidebar.markdown("- padā: quarter" )
+st.sidebar.markdown("- padā: quarter")
 st.sidebar.markdown("- anustubh: classical meter of 4×8 syllables")
 st.sidebar.markdown("- yamaka: repetition alankāra")
 
@@ -38,9 +38,10 @@ if text_iast:
     text_slp = transliterate(text_clean, sanscript.IAST, sanscript.SLP1)
 
     # 2. Split into syllables (SLP1)
-    # pattern: vowel groups AI, AU or simple vowels, optional anusvāra/visarga, plus trailing consonant if standalone
     vowel_pattern = r'(?:AI|AU|[aiuIREo])'
-    syl_pat = rf'([^ {vowel_pattern}]*{vowel_pattern}(?:M|H)?(?:[kgGNcjJTDtpbmyrlvSZsh](?!h))?)'
+    leading_consonants = r'[^aiuIREo\s]*'
+    consonant_ending = r'(?:[kgGNcjJTDtpbmyrlvSZsh](?!h))?'
+    syl_pat = rf'({leading_consonants}{vowel_pattern}(?:M|H)?{consonant_ending})'
     sylls = re.findall(syl_pat, text_slp)
     # pad or trim to grid_size
     if len(sylls) < grid_size:
@@ -61,7 +62,6 @@ if text_iast:
     rows = cols
     fig, ax = plt.subplots(figsize=(cols, rows))
     ax.set_xticks([]); ax.set_yticks([])
-    # draw squares and text
     for idx, syl in enumerate(sylls):
         row = rows - 1 - (idx // cols)
         col = idx % cols
@@ -72,12 +72,10 @@ if text_iast:
         if syl:
             ax.text(col+0.5, row+0.5, syl, ha='center', va='center', color=text_color, fontsize=12)
 
-    # highlight padā anustubh
     if show_pada_anustubh and is_anustubh:
         rect = Rectangle((0, 0), cols, rows, fill=False, edgecolor='red', linewidth=2)
         ax.add_patch(rect)
 
-    # legend
     legend_items = [Patch(facecolor='white', edgecolor='gray', label='laghu'),
                     Patch(facecolor='black', edgecolor='gray', label='guru')]
     if show_pada_anustubh and is_anustubh:
