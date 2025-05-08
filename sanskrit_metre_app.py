@@ -1,11 +1,10 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+import streamlit as st
 import matplotlib.pyplot as plt
 import re
 import unicodedata
-from indic_transliteration.sanscript import SchemeMap, SCHEMES, transliterate
+from indic_transliteration.sanscript import transliterate
 
-# Define syllable categories
+# Vowel definitions
 short_vowels = ['a', 'i', 'u', 'ṛ', 'ḷ']
 long_vowels = ['ā', 'ī', 'ū', 'ṝ', 'e', 'ai', 'o', 'au']
 
@@ -20,17 +19,15 @@ def detect_script(text):
     elif any('\u0900' <= c <= '\u097F' for c in text):
         return 'devanagari'
     else:
-        return 'iast'  # assume default
+        return 'iast'
 
 def transliterate_to_iast(text):
     script = detect_script(text)
     if script == 'iast':
         return text.lower()
-    else:
-        return transliterate(text, script, 'iast').lower()
+    return transliterate(text, script, 'iast').lower()
 
 def split_syllables(text):
-    # Very simple syllable splitter
     return re.findall(r'[^aeiouṛḷāīūṝeoau]*[aeiouṛḷāīūṝeoau]+(?:[ṃḥ])?', text)
 
 def is_guru(syl):
@@ -49,60 +46,40 @@ def syllables_to_grid(syllables, row_length):
     for i in range(0, len(syllables), row_length):
         row = syllables[i:i+row_length]
         binary = [1 if is_guru(s) else 0 for s in row]
-        binary += [0]*(row_length - len(binary))  # pad
+        binary += [0]*(row_length - len(binary))
         grid.append(binary)
     while len(grid) < 8:
         grid.append([0]*row_length)
     return grid
 
 def plot_grid(grid, index, row_length):
-    plt.figure(figsize=(row_length/2, 4))
-    plt.imshow(grid, cmap='gray', interpolation='nearest')
-    plt.axis('off')
-    plt.title(f'Block {index+1} ({row_length}×8)')
-    plt.savefig(f"block_{row_length}_{index+1:02d}.png", bbox_inches='tight', pad_inches=0)
-    plt.close()
+    fig, ax = plt.subplots(figsize=(row_length / 2, 4))
+    ax.imshow(grid, cmap='gray', interpolation='nearest')
+    ax.axis('off')
+    ax.set_title(f'Block {index+1} ({row_length}×8)')
+    st.pyplot(fig)
 
-def process_text(text, row_length):
-    text = normalize_text(transliterate_to_iast(text))
-    syllables = split_syllables(text)
-    blocks = make_blocks(syllables, row_length)
-    for i, block in enumerate(blocks):
-        grid = syllables_to_grid(block, row_length)
-        plot_grid(grid, i, row_length)
-    return len(blocks)
+# === Streamlit Interface ===
 
-# === GUI ===
+st.title("Sanskrit Meter Visualizer")
+st.markdown("Upload Sanskrit or Tamil text. Select the block size for syllable grouping.")
 
-def on_generate():
-    text = text_input.get("1.0", tk.END)
-    if not text.strip():
-        messagebox.showwarning("No Input", "Please enter some Sanskrit or Tamil text.")
-        return
-    try:
-        row_length = int(syllable_choice.get())
-        blocks_generated = process_text(text, row_length)
-        messagebox.showinfo("Success", f"{blocks_generated} blocks generated and saved as PNG.")
-    except Exception as e:
-        messagebox.showerror("Error", str(e))
+text_input = st.text_area("Paste your Sanskrit or Tamil text below:", height=200)
 
-# Create main window
-root = tk.Tk()
-root.title("Sanskrit Meter Visualizer")
+row_length = st.selectbox("Syllables per line (row):", [8, 16, 32], index=0)
 
-# Text input
-tk.Label(root, text="Enter Sanskrit/Tamil text:").pack()
-text_input = tk.Text(root, height=10, width=70, font=("Courier", 12))
-text_input.pack(padx=10, pady=5)
+if st.button("Generate Visualization"):
+    if not text_input.strip():
+        st.warning("Please enter some text.")
+    else:
+        try:
+            iast = transliterate_to_iast(normalize_text(text_input))
+            syllables = split_syllables(iast)
+            blocks = make_blocks(syllables, row_length=row_length)
 
-# Options
-tk.Label(root, text="Select syllables per row:").pack()
-syllable_choice = ttk.Combobox(root, values=["8", "16", "32"])
-syllable_choice.set("8")
-syllable_choice.pack(pady=5)
+            for i, block in enumerate(blocks):
+                grid = syllables_to_grid(block, row_length)
+                plot_grid(grid, i, row_length)
 
-# Generate button
-generate_btn = tk.Button(root, text="Generate", command=on_generate)
-generate_btn.pack(pady=10)
-
-root.mainloop()
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
