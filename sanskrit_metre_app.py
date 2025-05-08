@@ -130,18 +130,17 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
 
 # ===== UI =====
 st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Pathyā)")
-text = st.text_area("Введите шлоки на IAST:", height=200)
-columns = st.selectbox("Число слогов в строке:", [8, 16, 32], index=0)
-mode = 'flexible'  # гибкий режим
+text = st.text_area("Введите шлоки и pādas до danda (। или ॥) на IAST:", height=200)
 if st.button("Показать"):
     if text:
         s = normalize(text)
-        # разбиваем на стихи по точкам-стопам
+        # Разбиваем по danda (। и ॥)
         raw_blocks = re.split(r'[।॥]+', s)
         verse_blocks = [b.strip() for b in raw_blocks if b.strip()]
         for i, block in enumerate(verse_blocks, 1):
             syl = split_syllables_slp1(block)
-            st.subheader(f"Стих {i} — {len(syl)} слогов")
-            visualize_grid(syl, columns)
+            num = len(syl)
+            st.subheader(f"Стих {i} — {num} слогов, одна строка")
+            visualize_grid(syl, num)
     else:
-        st.warning("Введите текст IAST")
+        st.warning("Введите текст IAST до danda")
