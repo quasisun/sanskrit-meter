@@ -15,33 +15,27 @@ def normalize(text: str) -> str:
 
 # ===== Сегментация на слоги SLP1 =====
 def split_syllables_slp1(text: str) -> list[str]:
-    # Убираем пробелы для непрерывного деления
     s = re.sub(r"\s+", "", text)
     vowels = set('aAiIuUfFxXeEoO')
     n = len(s)
     sylls: list[str] = []
     pos = 0
     while pos < n:
-        # найти гласный
         j = pos
         while j < n and s[j] not in vowels:
             j += 1
         if j >= n:
             break
-        # nucleus и возможный M/H
         k = j + 1
         if k < n and s[k] in ('M', 'H'):
             k += 1
-        # кластер после гласного
         cstart = k
         while k < n and s[k] not in vowels:
             k += 1
         cluster = s[cstart:k]
-        # split cluster: 1 cons to coda, rest to next onset
         cut = k if len(cluster) <= 1 else cstart + 1
         sylls.append(s[pos:cut])
         pos = cut
-    # остаток добавляем к последнему слогу
     if pos < n:
         rem = s[pos:]
         if sylls:
@@ -60,14 +54,27 @@ def is_guru(s: str) -> bool:
     _, vowel, nasal, after = m.groups()
     return vowel in long_vowels or bool(nasal) or len(after) >= 2
 
-# ===== Визуализация: динамическая сетка =====
+# ===== Определение випулы =====
+vipula_colors = {
+    'Nagari': '#FF7F00',
+    'Bhavani': '#1E3F66',
+    'Shardula': '#2E8B57',
+    'Arya': '#8B0000',
+    'Vidyunmala': '#9932CC'
+}
+def identify_vipula(sylls: list[str]) -> str | None:
+    pattern = ''.join('g' if is_guru(s) else 'l' for s in sylls[:4])
+    mapping = {
+        'lglg': 'Nagari', 'lllg': 'Bhavani', 'llgg': 'Shardula',
+        'glgg': 'Arya',  'gglg': 'Vidyunmala'
+    }
+    return mapping.get(pattern)
+
+# ===== Визуализация: динамическая сетка с випулами =====
 def visualize_lines(lines: list[list[str]]) -> None:
-    # ИAST для отображения
     display = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in row] for row in lines]
     rows = len(lines)
     cols = max((len(row) for row in lines), default=0)
-
-    # Размер фигуры пропорционально сетке
     fig_w = max(cols, 1) / 8 * 6
     fig_h = max(rows, 1) / 8 * 6
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), constrained_layout=True)
@@ -77,7 +84,7 @@ def visualize_lines(lines: list[list[str]]) -> None:
     ax.set_aspect('equal')
 
     fs = 12
-    # Рисуем каждые строки подряд
+    # Основная отрисовка
     for r, row in enumerate(lines):
         for c, syl in enumerate(row):
             y = rows - 1 - r
@@ -85,10 +92,23 @@ def visualize_lines(lines: list[list[str]]) -> None:
             txt_color = 'white' if is_guru(syl) else 'black'
             ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='black'))
             ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=txt_color, fontsize=fs)
-
+    # Випула: анализ каждой строки отдельно
+    for r, row in enumerate(lines):
+        if len(row) >= 4:
+            vip = identify_vipula(row)
+            if vip:
+                y = rows - 1 - r
+                for c in range(min(4, len(row))):
+                    ax.add_patch(Rectangle((c, y), 1, 1,
+                                            facecolor=vipula_colors[vip], alpha=0.4))
     # Легенда
-    legend = [Patch(facecolor='black', label='guru'), Patch(facecolor='white', label='laghu')]
-    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=2, fontsize=8)
+    legend = [
+        Patch(facecolor='black', label='guru'),
+        Patch(facecolor='white', label='laghu')
+    ]
+    for name, col in vipula_colors.items():
+        legend.append(Patch(facecolor=col, alpha=0.4, label=name))
+    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=8)
     st.pyplot(fig)
 
 # ===== UI =====
