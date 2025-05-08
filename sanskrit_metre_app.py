@@ -15,39 +15,16 @@ def normalize(text: str) -> str:
 
 # ===== Сегментация на слоги SLP1 =====
 def split_syllables_slp1(text: str) -> list[str]:
-    # Убираем все пробельные символы, чтобы слоги не терялись на границах слов
-    s = re.sub(r"\s+", "", text)
-    vowels = set('aAiIuUfFxXeEoO')
-    n = len(s)
-    sylls: list[str] = []
-    pos = 0
-    while pos < n:
-        # ищем следующий гласный
-        j = pos
-        while j < n and s[j] not in vowels:
-            j += 1
-        if j >= n:
-            break
-        # nucleus найден в j; включаем опциональный M/H
-        k = j + 1
-        if k < n and s[k] in ('M', 'H'):
-            k += 1
-        # собираем кластер после гласного
-        cstart = k
-        while k < n and s[k] not in vowels:
-            k += 1
-        cluster = s[cstart:k]
-        # решаем, сколько символов кластер остаётся в слоге
-        if len(cluster) <= 1:
-            cut = k
-        else:
-            cut = cstart + 1
-        # добавляем слог
-        sylls.append(s[pos:cut])
-        pos = cut
-    # остаток (если есть) добавляем к последнему слогу
-    if pos < n:
-        rem = s[pos:]
+    # удаляем все пробельные символы, чтобы слоги не терялись на границах слов
+    t = re.sub(r"\s+", "", text)
+    vowel_set = 'aAiIuUfFxXeEoO'
+    # базовый паттерн: любое число согласных + гласный + опц. M/H
+    pat = rf'([^ {vowel_set}]*[{vowel_set}][MH]?)'
+    sylls = re.findall(pat, t)
+    # прикрепляем к последнему слогу все оставшиеся согласные в конце
+    consumed = ''.join(sylls)
+    rem = t[len(consumed):]
+    if rem:
         if sylls:
             sylls[-1] += rem
         else:
@@ -99,6 +76,13 @@ if st.button("Показать сетку"):
     if not text.strip():
         st.warning("Введите текст до danda!")
     else:
+        # разбиваем текст по danda на pādas
         parts = [p.strip() for p in re.split(r'[।॥]+', text) if p.strip()]
+        # превращаем каждую pāda в список слогов
         lines = [split_syllables_slp1(normalize(p)) for p in parts]
-        visualize_lines(lines)
+        # группируем pādas по два в ślokas
+        slokas = [lines[i:i+2] for i in range(0, len(lines), 2)]
+        # визуализируем каждый śloka как блок из 2 строк
+        for idx, block in enumerate(slokas, 1):
+            st.subheader(f"Śloka {idx}")
+            visualize_lines(block)
