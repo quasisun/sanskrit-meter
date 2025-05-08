@@ -141,7 +141,7 @@ def visualize_lines(lines: List[List[str]]) -> None:
     ]
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=8, frameon=False)
 
-    st.pyplot(fig)(fig)
+    st.pyplot(fig)
 
 # ===== UI =====
 st.title('Sloka Meter Visualizer')
