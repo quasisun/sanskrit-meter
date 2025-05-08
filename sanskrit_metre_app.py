@@ -94,7 +94,20 @@ def visualize_lines(lines: List[List[str]]) -> None:
     ax.set_aspect('equal')
     fs = 12
 
-    # 1) Draw cells and text
+    # 1) Draw row-level markers first (Vipula, Anuprāsa)
+    for r, row in enumerate(lines):
+        y = rows - 1 - r
+        # Vipula (по первым 4 слогам)
+        vip = identify_vipula(row)
+        if vip:
+            ax.add_patch(Rectangle((0, y), min(4, len(row)), 1,
+                                    facecolor=vipula_colors[vip], alpha=0.25, zorder=0))
+        # Vṛtti Anuprāsa (повтор onset слогов 5‑7)
+        if detect_vrttyanuprasa(row):
+            ax.add_patch(Rectangle((0, y), len(row), 1,
+                                    facecolor='purple', alpha=0.15, zorder=0))
+
+    # 2) Draw cells and text over backgrounds
     for r, row in enumerate(lines):
         for c, syl in enumerate(row):
             y = rows - 1 - r
@@ -103,7 +116,7 @@ def visualize_lines(lines: List[List[str]]) -> None:
             ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='gray', zorder=1))
             ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=tc, fontsize=fs, zorder=2)
 
-    # 2) Overlay sloka-level markers on top
+    # 3) Overlay sloka-level markers on top
     for start in range(0, len(all_sylls), 32):
         block = all_sylls[start:start+32]
         if len(block) < 32:
