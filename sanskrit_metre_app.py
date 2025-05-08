@@ -15,8 +15,8 @@ def normalize(text: str) -> str:
 
 # ===== Сегментация на слоги SLP1 =====
 def split_syllables_slp1(text: str) -> list[str]:
-    # убираем все пробельные символы, чтобы слоги не терялись на границах
-    t = re.sub(r"\s+", "", text)
+    # удаляем все пробельные символы
+    t = re.sub("\s+", "", text)
     vowel_set = 'aAiIuUfFxXeEoO'
     pat = rf'([^ {vowel_set}]*[{vowel_set}][MH]?)(?=[^{vowel_set}]*[{vowel_set}][MH]?|$)'
     return re.findall(pat, t)
