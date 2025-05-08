@@ -127,6 +127,6 @@ if st.button("Показать"):
             syl = split_syllables_slp1(block)
             num = len(syl)
             st.subheader(f"Стих {i} — {num} слогов, одна строка")
-            visualize_grid(syl, num)
+            visualize_grid(syl)
     else:
         st.warning("Введите текст IAST до danda")
