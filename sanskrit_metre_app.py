@@ -6,160 +6,133 @@ import unicodedata
 from indic_transliteration import sanscript
 from indic_transliteration.sanscript import transliterate
 
-# ===== Обработка текста =====
-short_vowels = ['a', 'i', 'u', 'f', 'x']  # SLP1 short vowels
+# ===== Конфигурация =====
+# Ограниченный алфавит SLP1 для санскритских гласных
+short_vowels = ['a', 'i', 'u', 'f', 'x']
 long_vowels = ['A', 'I', 'U', 'F', 'X', 'e', 'E', 'o', 'O']
 
+# Цвета для пяти классических випул
 vipula_colors = {
-    'Nagari': '#FF7F00',      # ярко-оранжевый
-    'Bhavani': '#1E3F66',     # насыщенный тёмно-синий
-    'Shardula': '#2E8B57',    # морской зелёный
-    'Arya': '#8B0000',        # тёмно-красный
-    'Vidyunmala': '#9932CC',  # тёмный фиолетовый
-    'Other': '#555555'        # тёмно-серый, чтобы выделялся
+    'Nagari': '#FF7F00',    # ярко-оранжевый
+    'Bhavani': '#1E3F66',   # насыщенный тёмно-синий
+    'Shardula': '#2E8B57',  # морской зелёный
+    'Arya': '#8B0000',      # тёмно-красный
+    'Vidyunmala': '#9932CC' # тёмный фиолетовый
 }
 
-anushtubh_colors = {
-    'Pathyā-anuṣṭubh': '#4682B4',     # steel blue
-    'Vipulā-anuṣṭubh': '#DAA520',     # goldenrod
-    'Unknown': '#A9A9A9'              # dim gray
-}
+# Цвет для Pathyā-anuṣṭubh
+pathyā_color = '#4682B4'  # steel blue
 
-def normalize(text):
+# ===== Преобразование IAST → SLP1 =====
+def normalize(text: str) -> str:
     text = text.strip()
     return transliterate(text, sanscript.IAST, sanscript.SLP1)
 
-def split_syllables_slp1(text):
-    pattern = r"""
-        ([^aAiIuUfFxXeEoOMH]*
-         [aAiIuUfFxXeEoO]
-         [MH]?
-         [^aAiIuUfFxXeEoOMH]?)
-    """
-    syllables = re.findall(pattern, text, re.VERBOSE)
-    return [s for s in syllables if s]
+# ===== Сегментация на слоги SLP1 =====
+def split_syllables_slp1(text: str) -> list[str]:
+    pattern = r'''([^aAiIuUfFxXeEoOMH]*[aAiIuUfFxXeEoO][MH]?[^aAiIuUfFxXeEoOMH]?)'''
+    return [s for s in re.findall(pattern, text) if s]
 
-def is_guru_syllable_slp1(syl):
-    m = re.match(r'^([^aAiIuUfFxXeEoOMH]*)([aAiIuUfFxXeEoO])([MH]?)([^aAiIuUfFxXeEoOMH]*)$', syl)
+# ===== Определение гуру/лакху =====
+def is_guru_syllable_slp1(syl: str) -> bool:
+    m = re.match(r'^([^aAiIuUfFxXeEoOMH]*)([aAiIuUfFxXeEoO])([MH]?)(.*)$', syl)
     if not m:
         return False
     _, vowel, nasal, after = m.groups()
-    if vowel in long_vowels:
-        return True
-    if nasal:
-        return True
-    if len(after) >= 2:
+    if vowel in long_vowels or nasal or len(after) >= 2:
         return True
     return False
 
-def identify_vipula(first_4):
-    pattern = ''.join(['g' if is_guru_syllable_slp1(s) else 'l' for s in first_4])
+# ===== Определение типа випулы =====
+def identify_vipula(first_4: list[str]) -> str | None:
+    pattern = ''.join('g' if is_guru_syllable_slp1(s) else 'l' for s in first_4)
     mapping = {
-        'lglg': 'Nagari',
-        'lllg': 'Bhavani',
-        'llgg': 'Shardula',
-        'glgg': 'Arya',
-        'gglg': 'Vidyunmala'
+        'lglg': 'Nagari', 'lllg': 'Bhavani', 'llgg': 'Shardula',
+        'glgg': 'Arya',  'gglg': 'Vidyunmala'
     }
-    return mapping.get(pattern, 'Other')
+    return mapping.get(pattern)
 
-def classify_anushtubh(syllables):
+# ===== Классификация вида шлоки =====
+def classify_pathya(syllables: list[str]) -> bool:
+    # Pathyā if 3rd pāda 5=laghu,6=guru and 4th pāda 5,6 = guru
     if len(syllables) < 32:
-        return 'Unknown'
+        return False
     p3 = syllables[16:24]
     p4 = syllables[24:32]
     if len(p3) < 6 or len(p4) < 6:
-        return 'Unknown'
-    l3_5 = is_guru_syllable_slp1(p3[4])
-    l3_6 = is_guru_syllable_slp1(p3[5])
-    l4_5 = is_guru_syllable_slp1(p4[4])
-    l4_6 = is_guru_syllable_slp1(p4[5])
-    if (not l3_5) and l3_6 and l4_5 and l4_6:
-        return 'Pathyā-anuṣṭubh'
-    else:
-        return 'Vipulā-anuṣṭubh'
+        return False
+    return (not is_guru_syllable_slp1(p3[4])
+            and is_guru_syllable_slp1(p3[5])
+            and is_guru_syllable_slp1(p4[4])
+            and is_guru_syllable_slp1(p4[5]))
 
-# ===== Визуализация =====
-def visualize_grid(syllables, line_length):
+# ===== Визуализация сетки =====
+def visualize_grid(syllables: list[str], line_length: int) -> None:
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.set_xlim(0, line_length)
     ax.set_ylim(0, line_length)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_aspect('equal')
+    ax.axis('off')
 
-    lines = [syllables[i:i + line_length] for i in range(0, len(syllables), line_length)]
+    # Разбивка по строкам
+    lines = [syllables[i:i+line_length] for i in range(0, len(syllables), line_length)]
     while len(lines) < line_length:
         lines.append([])
 
-    vipula_labels = ['Other', 'Other']
-    metre_type = classify_anushtubh(syllables)
-
-    if len(syllables) >= 32:
-        vipula_labels[0] = identify_vipula(syllables[0:4])
-        vipula_labels[1] = identify_vipula(syllables[16:20])
-
-    # Затем рисуем гуру/лакху поверх
-    for i in range(line_length):
-        line = lines[i] if i < len(lines) else []
+    # Рисуем базу Guru/Laghu
+    for i, row in enumerate(lines):
         for j in range(line_length):
-            x, y = j, line_length - 1 - i
-            if j < len(line):
-                syl = line[j]
-                guru = is_guru_syllable_slp1(syl)
-                base_color = 'black' if guru else 'white'
+            y = line_length - 1 - i
+            if j < len(row):
+                col = 'black' if is_guru_syllable_slp1(row[j]) else 'white'
             else:
-                base_color = 'white'
-            ax.add_patch(Rectangle((x, y), 1, 1, facecolor=base_color, edgecolor='black'))
+                col = 'white'
+            ax.add_patch(Rectangle((j, y), 1, 1, facecolor=col, edgecolor='black'))
 
-    # Поверх всех — подкраска випул полупрозрачным фоном
-    for shloka_start in range(0, len(syllables), 32):
-        if shloka_start + 32 <= len(syllables):
-            shloka = syllables[shloka_start:shloka_start + 32]
-            vipula_1 = identify_vipula(shloka[0:4])
-            vipula_2 = identify_vipula(shloka[16:20])
+    # Рисуем випулы для каждой шлоки (32 слога)
+    for start in range(0, min(len(syllables), 32*108), 32):
+        if start+32 > len(syllables): break
+        block = syllables[start:start+32]
+        v1 = identify_vipula(block[0:4])
+        v2 = identify_vipula(block[16:20])
+        # определяем строки
+        top_row = line_length - 1 - (start // line_length)
+        mid_row = top_row - 2
+        for idx, vip in enumerate((v1, v2)):
+            if vip and vip in vipula_colors:
+                row = top_row if idx==0 else mid_row
+                for j in range(4):
+                    ax.add_patch(Rectangle((j, row), 1, 1,
+                                            facecolor=vipula_colors[vip], alpha=0.65))
 
-            row_offset = line_length - 1 - (shloka_start // line_length)
-            row_1 = row_offset
-            row_3 = row_offset - 2
+    # Заголовок и легенда
+    title = f"{line_length}×{line_length} Grid"
+    if classify_pathya(syllables):
+        title += " — Pathyā-anuṣṭubh"
+    ax.set_title(title, fontsize=10)
 
-            for j in range(4):
-                if 0 <= row_1 < line_length:
-                    ax.add_patch(Rectangle((j, row_1), 1, 1, facecolor=vipula_colors[vipula_1], alpha=0.65))
-                if 0 <= row_3 < line_length:
-                    ax.add_patch(Rectangle((j, row_3), 1, 1, facecolor=vipula_colors[vipula_2], alpha=0.65))
-
-    ax.set_title(f"{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)
-
-
-    legend_elements = [
+    legend = [
         Patch(facecolor='black', edgecolor='black', label='Guru'),
-        Patch(facecolor='white', edgecolor='black', label='Laghu'),
-        Patch(facecolor=vipula_colors['Nagari'], alpha=0.65, label='Vipula: Nagari'),
-        Patch(facecolor=vipula_colors['Bhavani'], alpha=0.65, label='Vipula: Bhavani'),
-        Patch(facecolor=vipula_colors['Shardula'], alpha=0.65, label='Vipula: Shardula'),
-        Patch(facecolor=vipula_colors['Arya'], alpha=0.65, label='Vipula: Arya'),
-        Patch(facecolor=vipula_colors['Vidyunmala'], alpha=0.65, label='Vipula: Vidyunmala'),
-        Patch(facecolor=anushtubh_colors['Pathyā-anuṣṭubh'], alpha=0.5, label='Type: Pathyā-anuṣṭubh')
+        Patch(facecolor='white', edgecolor='black', label='Laghu')
     ]
-    ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.4), ncol=2, fontsize=8), ncol=2, fontsize=8)
+    for name, col in vipula_colors.items():
+        legend.append(Patch(facecolor=col, alpha=0.65, label=f'Vipula: {name}'))
+    legend.append(Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā-anuṣṭubh'))
+
+    ax.legend(handles=legend, loc='lower center',
+              bbox_to_anchor=(0.5, -0.15), ncol=3, fontsize=8)
     st.pyplot(fig)
 
 # ===== Streamlit UI =====
-st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Anuṣṭubh type)")
-
-text_input = st.text_area("Введите шлоки в IAST:", height=200)
-
-grid_size = st.selectbox("Размер сетки (по слогам в строке):", options=[8, 16, 32], index=0)
-
-if st.button("Визуализировать"):
-    if text_input.strip():
-        slp1_text = normalize(text_input)
-        syllables = split_syllables_slp1(slp1_text)
-        block_size = grid_size * grid_size
-        blocks = [syllables[i:i + block_size] for i in range(0, len(syllables), block_size)]
-        for i, block in enumerate(blocks):
-            st.subheader(f"Блок {i+1}")
-            visualize_grid(block, grid_size)
+st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Pathyā)")
+text = st.text_area("Введите шлоки на IAST (до 108 шлок):", height=200)
+size = st.selectbox("Слогов в строке:", [8, 16, 32], index=0)
+if st.button("Показать"):
+    if text:
+        s = normalize(text)
+        syl = split_syllables_slp1(s)
+        blocks = [syl[i:i+size*size] for i in range(0, len(syl), size*size)]
+        for i, b in enumerate(blocks[:108]):
+            st.subheader(f"Шлока {i+1}")
+            visualize_grid(b, size)
     else:
-        st.warning("Пожалуйста, введите текст.")
+        st.warning("Введите текст IAST")
