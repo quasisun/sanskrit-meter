@@ -63,27 +63,38 @@ def classify_pathya(syllables: list[str]) -> bool:
 
 # ===== Визуализация сетки (с IAST-слогами) =====
 def visualize_grid(syllables: list[str], columns: int) -> None:
-    # Получаем IAST для отображения
+    # IAST для отображения
     display = [transliterate(s, sanscript.SLP1, sanscript.IAST) for s in syllables]
     total = len(syllables)
     rows = math.ceil(total / columns)
 
-    # Масштабируем размер фигуры пропорционально количеству слогов
-    fig_width = columns / 8 * 6
+    # Вычисляем число слогов в каждой строке без пустышек
+    row_lengths = []
+    for r in range(rows):
+        start = r * columns
+        end = min(start + columns, total)
+        row_lengths.append(end - start)
+    max_len = max(row_lengths) if row_lengths else 0
+
+    # Размер фигуры пропорционально максимальной длине строки
+    fig_width = max_len / 8 * 6
     fig_height = rows / 8 * 6
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
-    ax.set_xlim(0, columns)
+    ax.set_xlim(0, max_len)
     ax.set_ylim(0, rows)
     ax.axis('off')
     ax.set_aspect('equal')
 
-    # Фиксированный размер шрифта для читаемости
+    # Постоянный размер шрифта для читаемости
     fs = 12
 
-    # Рисуем клетки и слоги
+    # Рисуем клетки и слоги по реальному числу в строках
     for idx, syl in enumerate(syllables):
         col = idx % columns
         row = rows - 1 - (idx // columns)
+        # если за пределом реальной длины для этой строки, пропускаем
+        if col >= row_lengths[rows - 1 - row]:
+            continue
         disp = display[idx]
         guru = is_guru_syllable_slp1(syl)
         face = 'black' if guru else 'white'
@@ -91,33 +102,30 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
         ax.add_patch(Rectangle((col, row), 1, 1, facecolor=face, edgecolor='black'))
         ax.text(col + 0.5, row + 0.5, disp, ha='center', va='center', color=txt_color, fontsize=fs)
 
-    # Высветка випулы для каждой śloka по 32 слога
+    # VIPULA и Pathyā (как раньше)
     for start in range(0, total, 32):
-        if start + 32 > total:
-            break
+        if start + 32 > total: break
         block = syllables[start:start + 32]
-        v1 = identify_vipula(block[0:4])
-        v2 = identify_vipula(block[16:20])
-        for idx, vip in enumerate((v1, v2)):
+        v1, v2 = identify_vipula(block[0:4]), identify_vipula(block[16:20])
+        for idx_v, vip in enumerate((v1, v2)):
             if vip in vipula_colors:
-                start_idx = start
-                rel_row = 0 if idx == 0 else 2
-                row = rows - 1 - ((start_idx // columns) + rel_row)
+                rel_row = 0 if idx_v == 0 else 2
+                abs_idx = start + rel_row * columns
+                row = rows - 1 - (abs_idx // columns)
                 for j in range(4):
-                    col = (start_idx + j) % columns
-                    ax.add_patch(Rectangle((col, row), 1, 1, facecolor=vipula_colors[vip], alpha=0.65))
+                    col = (start + j) % columns
+                    if col < row_lengths[rows - 1 - row]:
+                        ax.add_patch(Rectangle((col, row), 1, 1,
+                                                facecolor=vipula_colors[vip], alpha=0.65))
 
-    # Pathyā заголовок
-    title = f"{columns}×{rows} Grid"
-    if classify_pathya(syllables):
-        title += " — Pathyā-anuṣṭubh"
+    # Заголовок и легенда
+    title = f"{max_len}×{rows} Grid"
+    if classify_pathya(syllables): title += " — Pathyā-anuṣṭubh"
     ax.set_title(title, fontsize=10)
 
-    # Легенда
     legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu'),
               Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā')]
-    for name, col in vipula_colors.items():
-        legend.append(Patch(facecolor=col, alpha=0.65, label=name))
+    for name, colc in vipula_colors.items(): legend.append(Patch(facecolor=colc, alpha=0.65, label=name))
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=4, fontsize=8)
     st.pyplot(fig)
 
