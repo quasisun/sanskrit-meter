@@ -135,14 +135,15 @@ def visualize_grid(syllables: list[str], line_length: int) -> None:
 # ===== UI =====
 st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Pathyā)")
 text = st.text_area("Введите шлоки на IAST (до 108 шлок):", height=200)
-size = st.selectbox("Слогов в строке:", [8, 16, 32], index=0)
+size = st.selectbox("Размер сетки (кол-во слогов в строке и столбце):", [8, 16, 32], index=0)
 if st.button("Показать"):
     if text:
         s = normalize(text)
         syl = split_syllables_slp1(s)
-        blocks = [syl[i:i + size * size] for i in range(0, len(syl), size * size)]
+        # Разбиваем на отдельные śloka по 32 слога
+        blocks = [syl[i:i+32] for i in range(0, len(syl), 32)]
         for i, b in enumerate(blocks[:108]):
-            st.subheader(f"Шлока {i+1}")
+            st.subheader(f"Шlока {i+1}")
             visualize_grid(b, size)
     else:
         st.warning("Введите текст IAST")
