@@ -97,9 +97,7 @@ if st.button("Показать сетку"):
         parts = [p.strip() for p in re.split(r'[।॥]+', text) if p.strip()]
         # превращаем каждую pāda в список слогов
         lines = [split_syllables_slp1(normalize(p)) for p in parts]
-        # группируем pādas по два в ślokas
-        slokas = [lines[i:i+2] for i in range(0, len(lines), 2)]
-        # визуализируем каждый śloka как блок из 2 строк
-        for idx, block in enumerate(slokas, 1):
-            st.subheader(f"Śloka {idx}")
-            visualize_lines(block)
+        # отрисовываем каждую pāda отдельно в одном блоке (без разбивки на śloka)
+        for i, row in enumerate(lines, 1):
+            st.subheader(f"Pāda {i} — {len(row)} слогов")
+            visualize_lines([row])
