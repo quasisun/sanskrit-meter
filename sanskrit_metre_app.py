@@ -15,11 +15,21 @@ def normalize(text: str) -> str:
 
 # ===== Сегментация на слоги SLP1 =====
 def split_syllables_slp1(text: str) -> list[str]:
-    # удаляем все пробельные символы
-    t = re.sub("\s+", "", text)
+    # удаляем все пробельные символы, чтобы слоги не терялись на границах слов
+    t = re.sub(r"\s+", "", text)
     vowel_set = 'aAiIuUfFxXeEoO'
-    pat = rf'([^ {vowel_set}]*[{vowel_set}][MH]?)(?=[^{vowel_set}]*[{vowel_set}][MH]?|$)'
-    return re.findall(pat, t)
+    # базовый паттерн: любое число согласных + гласный + опц. M/H
+    pat = rf'([^ {vowel_set}]*[{vowel_set}][MH]?)'
+    sylls = re.findall(pat, t)
+    # прикрепляем к последнему слогу все оставшиеся согласные в конце
+    consumed = ''.join(sylls)
+    rem = t[len(consumed):]
+    if rem:
+        if sylls:
+            sylls[-1] += rem
+        else:
+            sylls = [rem]
+    return sylls
 
 # ===== Определение гуру/лакху =====
 short_vowels = ['a', 'i', 'u', 'f', 'x']
@@ -33,12 +43,11 @@ def is_guru(s: str) -> bool:
 
 # ===== Визуализация: строки → сетка =====
 def visualize_lines(lines: list[list[str]]) -> None:
-    # Перевод на IAST для отображения
+    # перевод в IAST для показа
     display = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in row] for row in lines]
     rows = len(lines)
     cols = max(len(row) for row in lines) if rows>0 else 0
 
-    # Размеры фигуры
     fig_w = max(cols, 1) / 8 * 6
     fig_h = max(rows,1) / 8 * 6
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), constrained_layout=True)
@@ -47,8 +56,7 @@ def visualize_lines(lines: list[list[str]]) -> None:
     ax.axis('off')
     ax.set_aspect('equal')
 
-    fs = 12  # фиксированный размер шрифта
-    # Рисуем клетки и текст
+    fs = 12
     for r, row in enumerate(lines):
         for c, syl in enumerate(row):
             y = rows - 1 - r
@@ -57,11 +65,8 @@ def visualize_lines(lines: list[list[str]]) -> None:
             ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='black'))
             ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=txt_color, fontsize=fs)
 
-    # Легенда
     legend = [Patch(facecolor='black', label='guru'), Patch(facecolor='white', label='laghu')]
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=2, fontsize=8)
-
-    # Отображаем
     st.pyplot(fig)
 
 # ===== UI =====
@@ -71,9 +76,6 @@ if st.button("Показать сетку"):
     if not text.strip():
         st.warning("Введите текст до danda!")
     else:
-        # Разбиваем на строки (pādas) по danda
-        parts = [p.strip() for p in re.split(r'[।॥]', text) if p.strip()]
-        # Для каждой создаём список слогов в SLP1
+        parts = [p.strip() for p in re.split(r'[।॥]+', text) if p.strip()]
         lines = [split_syllables_slp1(normalize(p)) for p in parts]
-        # Выводим одну общую сетку
         visualize_lines(lines)
