@@ -19,6 +19,12 @@ vipula_colors = {
     'Other': '#D3D3D3'
 }
 
+anushtubh_colors = {
+    'Pathyā-anuṣṭubh': '#B0E0E6',
+    'Vipulā-anuṣṭubh': '#F5DEB3',
+    'Unknown': '#FFFFFF'
+}
+
 def normalize(text):
     text = text.strip()
     return transliterate(text, sanscript.IAST, sanscript.SLP1)
@@ -57,6 +63,22 @@ def identify_vipula(first_4):
     }
     return mapping.get(pattern, 'Other')
 
+def classify_anushtubh(syllables):
+    if len(syllables) < 32:
+        return 'Unknown'
+    p3 = syllables[16:24]
+    p4 = syllables[24:32]
+    if len(p3) < 6 or len(p4) < 6:
+        return 'Unknown'
+    l3_5 = is_guru_syllable_slp1(p3[4])
+    l3_6 = is_guru_syllable_slp1(p3[5])
+    l4_5 = is_guru_syllable_slp1(p4[4])
+    l4_6 = is_guru_syllable_slp1(p4[5])
+    if (not l3_5) and l3_6 and l4_5 and l4_6:
+        return 'Pathyā-anuṣṭubh'
+    else:
+        return 'Vipulā-anuṣṭubh'
+
 # ===== Визуализация =====
 def visualize_grid(syllables, line_length):
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -70,8 +92,9 @@ def visualize_grid(syllables, line_length):
     while len(lines) < line_length:
         lines.append([])
 
-    # определим випулы для двух половин шлоки (если 32 слога минимум)
     vipula_labels = ['Other', 'Other']
+    metre_type = classify_anushtubh(syllables)
+
     if len(syllables) >= 32:
         vipula_labels[0] = identify_vipula(syllables[0:4])
         vipula_labels[1] = identify_vipula(syllables[16:20])
@@ -84,7 +107,8 @@ def visualize_grid(syllables, line_length):
                 syl = line[j]
                 guru = is_guru_syllable_slp1(syl)
                 base_color = 'black' if guru else 'white'
-                # подкрашиваем фон для випулы
+
+                # Vipula background
                 if (i == 0 and j < 4):
                     color = vipula_colors[vipula_labels[0]]
                     ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.3))
@@ -95,7 +119,7 @@ def visualize_grid(syllables, line_length):
                 base_color = 'white'
             ax.add_patch(Rectangle((x, y), 1, 1, facecolor=base_color, edgecolor='black'))
 
-    ax.set_title(f'{line_length}x{line_length} Grid — Vipula: {vipula_labels[0]}, {vipula_labels[1]}', fontsize=10)
+    ax.set_title(f'{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}', fontsize=10)
 
     legend_elements = [
         Patch(facecolor='black', edgecolor='black', label='Guru'),
@@ -103,12 +127,14 @@ def visualize_grid(syllables, line_length):
     ]
     for name, color in vipula_colors.items():
         legend_elements.append(Patch(facecolor=color, alpha=0.3, label=f'Vipula: {name}'))
+    for name, color in anushtubh_colors.items():
+        legend_elements.append(Patch(facecolor=color, alpha=0.1, label=f'Type: {name}'))
 
-    ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize=8)
+    ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.4), ncol=2, fontsize=8)
     st.pyplot(fig)
 
 # ===== Streamlit UI =====
-st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula)")
+st.title("Shloka Visualizer (IAST → SLP1 → Guru/Laghu + Vipula + Anuṣṭubh type)")
 
 text_input = st.text_area("Введите шлоки в IAST:", height=200)
 
