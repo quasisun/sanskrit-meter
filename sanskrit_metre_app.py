@@ -113,13 +113,24 @@ def visualize_grid(syllables, line_length):
             ax.add_patch(Rectangle((x, y), 1, 1, facecolor=base_color, edgecolor='black'))
 
     # Поверх всех — подкраска випул полупрозрачным фоном
-    vipula_rows = [line_length - 1, line_length - 3]
-    for idx, row in enumerate(vipula_rows):
-        for j in range(4):
-            x, y = j, row
-            color = vipula_colors[vipula_labels[idx]]
-            ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.65))
-    ax.set_title(f"{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)
+    for shloka_start in range(0, len(syllables), 32):
+        if shloka_start + 32 <= len(syllables):
+            shloka = syllables[shloka_start:shloka_start + 32]
+            vipula_1 = identify_vipula(shloka[0:4])
+            vipula_2 = identify_vipula(shloka[16:20])
+
+            row_offset = line_length - 1 - (shloka_start // line_length)
+            row_1 = row_offset
+            row_3 = row_offset - 2
+
+            for j in range(4):
+                if 0 <= row_1 < line_length:
+                    ax.add_patch(Rectangle((j, row_1), 1, 1, facecolor=vipula_colors[vipula_1], alpha=0.65))
+                if 0 <= row_3 < line_length:
+                    ax.add_patch(Rectangle((j, row_3), 1, 1, facecolor=vipula_colors[vipula_2], alpha=0.65))
+
+    ax.set_title(f"{line_length}x{line_length} Grid — {metre_type}
+Vipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)(f"{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)
 
 
     legend_elements = [
