@@ -164,4 +164,7 @@ if st.button('Show'):
     if not parts:
         st.error('No valid lines found.')
     else:
-        lines = [split_syllables_slp1(normalize(p))
+        lines = [split_syllables_slp1(normalize(p)) for p in parts]
+        visualize_lines(lines)
+
+st.markdown("<div style='text-align:center; font-size:0.9em; margin-top:1em;'>App by Svetlana Kreuzer</div>", unsafe_allow_html=True)
