@@ -25,10 +25,11 @@ def normalize(text: str) -> str:
     text = re.sub(r'[।॥\d]', '', text)
     return transliterate(text, sanscript.IAST, sanscript.SLP1)
 
-# ===== Сегментация на слоги SLP1 =====
+# ===== Сегментация на слоги SLP1 (updated) =====
 def split_syllables_slp1(text: str) -> list[str]:
-    pattern = r"([^aAiIuUfFxXeEoOMH]*[aAiIuUfFxXeEoO][MH]?[^aAiIuUfFxXeEoOMH]?)"
-    return [s for s in re.findall(pattern, text) if s]
+    vowel_set = 'aAiIuUfFxXeEoO'
+    pat = rf'([^ {vowel_set}]*[{vowel_set}][MH]?)(?=[^{vowel_set}]*[{vowel_set}][MH]?|$)'
+    return re.findall(pat, text)
 
 # ===== Определение гуру/лакху =====
 def is_guru_syllable_slp1(syl: str) -> bool:
@@ -61,7 +62,6 @@ def classify_pathya(syllables: list[str]) -> bool:
 
 # ===== Визуализация сетки (с IAST-слогами) =====
 def visualize_grid(syllables: list[str], line_length: int) -> None:
-    # Сохраняем соответствие SLP1 → IAST для отображения
     display = [transliterate(s, sanscript.SLP1, sanscript.IAST) for s in syllables]
 
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -70,52 +70,50 @@ def visualize_grid(syllables: list[str], line_length: int) -> None:
     ax.axis('off')
     ax.set_aspect('equal')
 
-    # разбивка по строкам
     lines = [syllables[i:i+line_length] for i in range(0, len(syllables), line_length)]
     display_lines = [display[i:i+line_length] for i in range(0, len(display), line_length)]
     while len(lines) < line_length:
         lines.append([])
         display_lines.append([])
 
-    # базовая сетка и текст IAST-слога
+    # Рисуем сетку и слоги с уменьшенным шрифтом
     for i, (row, drow) in enumerate(zip(lines, display_lines)):
         for j in range(line_length):
             y = line_length - 1 - i
             syl = row[j] if j < len(row) else ''
             disp = drow[j] if j < len(drow) else ''
-            guru = is_guru_syllable_slp1(syl) if syl else False
+            guru = is_guru_syllable_slp1(syl)
             face = 'black' if guru else 'white'
             txt_color = 'white' if guru else 'black'
             ax.add_patch(Rectangle((j, y), 1, 1, facecolor=face, edgecolor='black'))
             if disp:
-                ax.text(j+0.5, y+0.5, disp, ha='center', va='center', color=txt_color, fontsize=10)
+                ax.text(j + 0.5, y + 0.5, disp,
+                        ha='center', va='center', color=txt_color, fontsize=6)
 
-    # випулы
+    # Рисуем випулы и Pathyā
     for start in range(0, min(len(syllables), 32*108), 32):
-        if start+32 > len(syllables): break
+        if start + 32 > len(syllables):
+            break
         block = syllables[start:start+32]
-        v1 = identify_vipula(block[0:4])
-        v2 = identify_vipula(block[16:20])
+        v1, v2 = identify_vipula(block[0:4]), identify_vipula(block[16:20])
         top_row = line_length - 1 - (start // line_length)
         mid_row = top_row - 2
         for idx, vip in enumerate((v1, v2)):
-            if vip and vip in vipula_colors:
-                row = top_row if idx == 0 else mid_row
+            if vip in vipula_colors:
+                r = top_row if idx == 0 else mid_row
                 for j in range(4):
-                    ax.add_patch(Rectangle((j, row), 1, 1,
+                    ax.add_patch(Rectangle((j, r), 1, 1,
                                             facecolor=vipula_colors[vip], alpha=0.65))
-
-    # заголовок и легенда
-    title = f"{line_length}×{line_length} Grid"
     if classify_pathya(syllables):
-        title += " — Pathyā-anuṣṭubh"
-    ax.set_title(title, fontsize=10)
+        ax.set_title(f"{line_length}×{line_length} Grid — Pathyā-anuṣṭubh", fontsize=10)
+    else:
+        ax.set_title(f"{line_length}×{line_length} Grid", fontsize=10)
 
-    legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu')]
+    legend = [Patch(facecolor='black', label='Guru'), Patch(facecolor='white', label='Laghu'),
+              Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā')]
     for name, col in vipula_colors.items():
         legend.append(Patch(facecolor=col, alpha=0.65, label=name))
-    legend.append(Patch(facecolor=pathyā_color, alpha=0.5, label='Pathyā'))
-    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=3, fontsize=8)
+    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=4, fontsize=8)
     st.pyplot(fig)
 
 # ===== UI =====
@@ -126,7 +124,7 @@ if st.button("Показать"):
     if text:
         s = normalize(text)
         syl = split_syllables_slp1(s)
-        blocks = [syl[i:i+size*size] for i in range(0, len(syl), size*size)]
+        blocks = [syl[i:i + size * size] for i in range(0, len(syl), size * size)]
         for i, b in enumerate(blocks[:108]):
             st.subheader(f"Шлока {i+1}")
             visualize_grid(b, size)
