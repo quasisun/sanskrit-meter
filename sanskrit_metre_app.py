@@ -99,6 +99,7 @@ def visualize_grid(syllables, line_length):
         vipula_labels[0] = identify_vipula(syllables[0:4])
         vipula_labels[1] = identify_vipula(syllables[16:20])
 
+    # Затем рисуем гуру/лакху поверх
     for i in range(line_length):
         line = lines[i] if i < len(lines) else []
         for j in range(line_length):
@@ -107,19 +108,19 @@ def visualize_grid(syllables, line_length):
                 syl = line[j]
                 guru = is_guru_syllable_slp1(syl)
                 base_color = 'black' if guru else 'white'
-
-                # Vipula background
-                if (i == 0 and j < 4):
-                    color = vipula_colors[vipula_labels[0]]
-                    ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.3))
-                elif (i == 2 and j < 4):
-                    color = vipula_colors[vipula_labels[1]]
-                    ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.3))
             else:
                 base_color = 'white'
             ax.add_patch(Rectangle((x, y), 1, 1, facecolor=base_color, edgecolor='black'))
 
-    ax.set_title(f'{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}', fontsize=10)
+    # Поверх всех — подкраска випул полупрозрачным фоном
+    vipula_rows = [line_length - 1, line_length - 3]
+    for idx, row in enumerate(vipula_rows):
+        for j in range(4):
+            x, y = j, row
+            color = vipula_colors[vipula_labels[idx]]
+            ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.3))
+
+(f'{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}', fontsize=10)
 
     legend_elements = [
         Patch(facecolor='black', edgecolor='black', label='Guru'),
