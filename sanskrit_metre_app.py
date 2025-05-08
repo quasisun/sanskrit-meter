@@ -15,9 +15,11 @@ def normalize(text: str) -> str:
 
 # ===== Сегментация на слоги SLP1 =====
 def split_syllables_slp1(text: str) -> list[str]:
+    # Убираем все пробельные символы, чтобы слоги не терялись на границах слов
+    t = re.sub(r"\s+", "", text)
     vowel_set = 'aAiIuUfFxXeEoO'
     pat = rf'([^ {vowel_set}]*[{vowel_set}][MH]?)(?=[^{vowel_set}]*[{vowel_set}][MH]?|$)'
-    return re.findall(pat, text)
+    return re.findall(pat, t)
 
 # ===== Определение гуру/лакху =====
 short_vowels = ['a', 'i', 'u', 'f', 'x']
