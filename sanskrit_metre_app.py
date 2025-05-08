@@ -98,30 +98,49 @@ def visualize_grid(syllables: list[str], columns: int) -> None:
         ax.text(col + 0.5, row + 0.5, disp, ha='center', va='center', color=txt_color, fontsize=fs)
 
         # Отметка випул для каждого ślока (32 слога)
-    for start in range(0, total, 32):
-        if start + 32 > total:
-            break
-        block = syllables[start:start + 32]
-        v1 = identify_vipula(block[0:4])
-        v2 = identify_vipula(block[16:20])
-        for idx_v, vip in enumerate((v1, v2)):
-            # rel_row == 0 для первого випула, 2 для второго
-            rel_row = 0 if idx_v == 0 else 2
-            # пропускаем, если строки меньше rel_row+1
-            if rel_row >= rows:
-                continue
-            if vip in vipula_colors:
-                # абсолютный индекс первого слога випулы
-                abs_idx = start + rel_row * columns
-                r = rows - 1 - (abs_idx // columns)
-                # проверка валидности строки
-                if r < 0 or r >= rows:
+    # Отметка випул для каждого śloka (32 слога)
+
+    if total >= 32:
+
+        for start in range(0, total, 32):
+
+            if start + 32 > total:
+
+                break
+
+            block = syllables[start:start + 32]
+
+            v1 = identify_vipula(block[0:4])
+
+            v2 = identify_vipula(block[16:20])
+
+            for idx_v, vip in enumerate((v1, v2)):
+
+                rel_row = 0 if idx_v == 0 else 2
+
+                if rel_row >= rows:
+
                     continue
-                for j in range(4):
-                    c = (start + j) % columns
-                    if c < row_lengths[rows - 1 - r]:
-                        ax.add_patch(Rectangle((c, r), 1, 1,
-                                                facecolor=vipula_colors[vip], alpha=0.65))
+
+                if vip in vipula_colors:
+
+                    abs_idx = start + rel_row * columns
+
+                    r = rows - 1 - (abs_idx // columns)
+
+                    if r < 0 or r >= rows:
+
+                        continue
+
+                    for j in range(4):
+
+                        c = (start + j) % columns
+
+                        if c < row_lengths[rows - 1 - r]:
+
+                            ax.add_patch(Rectangle((c, r), 1, 1,
+
+                                                    facecolor=vipula_colors[vip], alpha=0.65))
 
     # Заголовок
     title = f"{max_len}×{rows} Grid"
