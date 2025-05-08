@@ -120,8 +120,8 @@ def visualize_grid(syllables, line_length):
             color = vipula_colors[vipula_labels[idx]]
             ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.3))
 
-ax.set_title(f'{line_length}x{line_length} Grid — {metre_type}
-Vipula: {vipula_labels[0]}, {vipula_labels[1]}', fontsize=10)
+ax.set_title(f"{line_length}x{line_length} Grid — {metre_type}
+Vipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)
 
     legend_elements = [
         Patch(facecolor='black', edgecolor='black', label='Guru'),
