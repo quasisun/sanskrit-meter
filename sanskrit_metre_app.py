@@ -85,7 +85,8 @@ def visualize_lines(lines: List[List[str]]) -> None:
     rows = len(lines)
     cols = max((len(r) for r in lines), default=0)
     display = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in row] for row in lines]
-    all_sylls = [s for row in lines for s in row]
+    # pre-flatten for śloka grouping
+    slokas = [lines[i:i+2] for i in range(0, rows, 2)]
 
     fig, ax = plt.subplots(figsize=(cols/8*6, rows/8*6), constrained_layout=True)
     ax.set_xlim(0, cols)
@@ -94,7 +95,28 @@ def visualize_lines(lines: List[List[str]]) -> None:
     ax.set_aspect('equal')
     fs = 12
 
-    # базовая отрисовка guru/laghu и текста
+    # Сначала закрашиваем фоном śloka-level маркеры (fill=True)
+    for i, sloka in enumerate(slokas):
+        r_start = i*2
+        height = min(2, rows - r_start)
+        y0 = rows - r_start - height
+        # сглаженная highlight: pathya
+        block = sum(sloka, [])
+        if len(block) >= 32 and classify_pathya(block):
+            ax.add_patch(Rectangle((0, y0), min(cols,32), height, facecolor='blue', alpha=0.1, zorder=0))
+        # yamaka
+        if len(block) >= 32 and detect_padayadi_yamaka(block):
+            ax.add_patch(Rectangle((0, y0), min(cols,32), height, facecolor='green', alpha=0.1, zorder=0))
+        if len(block) >= 32 and detect_padaanta_yamaka(block):
+            ax.add_patch(Rectangle((0, y0), min(cols,32), height, facecolor='red', alpha=0.1, zorder=0))
+
+    # line-level anuprāsa background
+    for r, row in enumerate(lines):
+        if detect_vrttyanuprasa(row):
+            y = rows - 1 - r
+            ax.add_patch(Rectangle((0, y), len(row), 1, facecolor='purple', alpha=0.1, zorder=0))
+
+    # Отрисовка guru/laghu и текста поверх
     for r, row in enumerate(lines):
         for c, syl in enumerate(row):
             y = rows - 1 - r
@@ -103,35 +125,14 @@ def visualize_lines(lines: List[List[str]]) -> None:
             ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='gray', zorder=1))
             ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=tc, fontsize=fs, zorder=2)
 
-    # подсветка śloka-level (pathya, yamaka)
-    for start in range(0, len(all_sylls), 32):
-        block = all_sylls[start:start+32]
-        sloka_row = start // cols
-        y0 = rows - sloka_row - 2  # верхняя строка śloka
-        # pathya anuṣṭubh
-        if len(block) == 32 and classify_pathya(block):
-            ax.add_patch(Rectangle((0, y0), 8, 2, fill=False, edgecolor='blue', linewidth=3, zorder=3))
-        # pāda-ādi yamaka
-        if len(block) == 32 and detect_padayadi_yamaka(block):
-            ax.add_patch(Rectangle((0, y0), 8, 2, fill=False, edgecolor='green', linestyle='--', linewidth=3, zorder=4))
-        # pāda-anta yamaka
-        if len(block) == 32 and detect_padaanta_yamaka(block):
-            ax.add_patch(Rectangle((0, y0), 8, 2, fill=False, edgecolor='red', linestyle=':', linewidth=3, zorder=5))
-
-    # line-level anuprāsa
-    for r, row in enumerate(lines):
-        if detect_vrttyanuprasa(row):
-            y = rows - 1 - r
-            ax.add_patch(Rectangle((0, y), len(row), 1, fill=False, edgecolor='purple', linewidth=3, zorder=6))
-
-    # легенда
+    # Легенда
     legend = [
         Patch(facecolor='black', label='Guru'),
         Patch(facecolor='white', label='Laghu'),
-        Patch(edgecolor='blue', fill=False, label='Pathya Anuṣṭubh'),
-        Patch(edgecolor='green', linestyle='--', fill=False, label='Pāda-ādi Yamaka'),
-        Patch(edgecolor='red', linestyle=':', fill=False, label='Pāda-anta Yamaka'),
-        Patch(edgecolor='purple', fill=False, label='Vṛtti Anuprāsa')
+        Patch(facecolor='blue', alpha=0.1, label='Pathya Anuṣṭubh'),
+        Patch(facecolor='green', alpha=0.1, label='Pāda-ādi Yamaka'),
+        Patch(facecolor='red', alpha=0.1, label='Pāda-anta Yamaka'),
+        Patch(facecolor='purple', alpha=0.1, label='Vṛtti Anuprāsa')
     ]
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=8, frameon=False)
 
