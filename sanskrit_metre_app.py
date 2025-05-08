@@ -10,7 +10,7 @@ from indic_transliteration.sanscript import transliterate
 # ===== Преобразование IAST → SLP1 =====
 def normalize(text: str) -> str:
     t = unicodedata.normalize('NFC', text.strip())
-    t = re.sub(r'[।॥\d]', '', t)
+    t = re.sub(r'[।॥|\d]', '', t)
     return transliterate(t, sanscript.IAST, sanscript.SLP1)
 
 # ===== Сегментация на слоги =====
@@ -132,7 +132,7 @@ def visualize_lines(lines: List[List[str]]):
 st.title('Sloka Meter Visualizer')
 text=st.text_area('Введите IAST‑текст, строки через danda (। или ॥):',height=200)
 if st.button('Показать'):
-    parts=[p.strip() for p in re.split(r'[।॥]+',text) if p.strip()]
+    parts=[p.strip() for p in re.split(r'[।॥|]+',text) if p.strip()]
     if not parts:
         st.error('Нет строк');
     else:
