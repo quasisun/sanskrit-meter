@@ -134,7 +134,13 @@ def visualize_grid(syllables, line_length):
 
     legend_elements = [
         Patch(facecolor='black', edgecolor='black', label='Guru'),
-        Patch(facecolor='white', edgecolor='black', label='Laghu')
+        Patch(facecolor='white', edgecolor='black', label='Laghu'),
+        Patch(facecolor=vipula_colors['Nagari'], alpha=0.65, label='Vipula: Nagari'),
+        Patch(facecolor=vipula_colors['Bhavani'], alpha=0.65, label='Vipula: Bhavani'),
+        Patch(facecolor=vipula_colors['Shardula'], alpha=0.65, label='Vipula: Shardula'),
+        Patch(facecolor=vipula_colors['Arya'], alpha=0.65, label='Vipula: Arya'),
+        Patch(facecolor=vipula_colors['Vidyunmala'], alpha=0.65, label='Vipula: Vidyunmala'),
+        Patch(facecolor=anushtubh_colors['Pathyā-anuṣṭubh'], alpha=0.5, label='Type: Pathyā-anuṣṭubh')
     ]
     for name, color in vipula_colors.items():
         legend_elements.append(Patch(facecolor=color, alpha=0.65, label=f'Vipula: {name}'))
