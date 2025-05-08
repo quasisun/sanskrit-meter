@@ -59,29 +59,36 @@ def classify_pathya(syllables: list[str]) -> bool:
             and is_guru_syllable_slp1(p4[4])
             and is_guru_syllable_slp1(p4[5]))
 
-# ===== Визуализация сетки =====
+# ===== Визуализация сетки (с IAST-слогами) =====
 def visualize_grid(syllables: list[str], line_length: int) -> None:
+    # Сохраняем соответствие SLP1 → IAST для отображения
+    display = [transliterate(s, sanscript.SLP1, sanscript.IAST) for s in syllables]
+
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.set_xlim(0, line_length)
     ax.set_ylim(0, line_length)
     ax.axis('off')
+    ax.set_aspect('equal')
 
-    # строки слогов
+    # разбивка по строкам
     lines = [syllables[i:i+line_length] for i in range(0, len(syllables), line_length)]
+    display_lines = [display[i:i+line_length] for i in range(0, len(display), line_length)]
     while len(lines) < line_length:
         lines.append([])
+        display_lines.append([])
 
-    # базовая сетка и текст слога
-    for i, row in enumerate(lines):
+    # базовая сетка и текст IAST-слога
+    for i, (row, drow) in enumerate(zip(lines, display_lines)):
         for j in range(line_length):
             y = line_length - 1 - i
             syl = row[j] if j < len(row) else ''
+            disp = drow[j] if j < len(drow) else ''
             guru = is_guru_syllable_slp1(syl) if syl else False
             face = 'black' if guru else 'white'
             txt_color = 'white' if guru else 'black'
             ax.add_patch(Rectangle((j, y), 1, 1, facecolor=face, edgecolor='black'))
-            if syl:
-                ax.text(j+0.5, y+0.5, syl, ha='center', va='center', color=txt_color, fontsize=10)
+            if disp:
+                ax.text(j+0.5, y+0.5, disp, ha='center', va='center', color=txt_color, fontsize=10)
 
     # випулы
     for start in range(0, min(len(syllables), 32*108), 32):
