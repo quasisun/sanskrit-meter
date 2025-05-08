@@ -85,8 +85,7 @@ def visualize_lines(lines: List[List[str]]) -> None:
     rows = len(lines)
     cols = max((len(r) for r in lines), default=0)
     display = [[transliterate(s, sanscript.SLP1, sanscript.IAST) for s in row] for row in lines]
-    # pre-flatten for śloka grouping
-    slokas = [lines[i:i+2] for i in range(0, rows, 2)]
+    all_sylls = [s for row in lines for s in row]
 
     fig, ax = plt.subplots(figsize=(cols/8*6, rows/8*6), constrained_layout=True)
     ax.set_xlim(0, cols)
@@ -95,28 +94,7 @@ def visualize_lines(lines: List[List[str]]) -> None:
     ax.set_aspect('equal')
     fs = 12
 
-    # Сначала закрашиваем фоном śloka-level маркеры (fill=True)
-    for i, sloka in enumerate(slokas):
-        r_start = i*2
-        height = min(2, rows - r_start)
-        y0 = rows - r_start - height
-        # сглаженная highlight: pathya
-        block = sum(sloka, [])
-        if len(block) >= 32 and classify_pathya(block):
-            ax.add_patch(Rectangle((0, y0), min(cols,32), height, facecolor='blue', alpha=0.1, zorder=0))
-        # yamaka
-        if len(block) >= 32 and detect_padayadi_yamaka(block):
-            ax.add_patch(Rectangle((0, y0), min(cols,32), height, facecolor='green', alpha=0.1, zorder=0))
-        if len(block) >= 32 and detect_padaanta_yamaka(block):
-            ax.add_patch(Rectangle((0, y0), min(cols,32), height, facecolor='red', alpha=0.1, zorder=0))
-
-    # line-level anuprāsa background
-    for r, row in enumerate(lines):
-        if detect_vrttyanuprasa(row):
-            y = rows - 1 - r
-            ax.add_patch(Rectangle((0, y), len(row), 1, facecolor='purple', alpha=0.1, zorder=0))
-
-    # Отрисовка guru/laghu и текста поверх
+    # 1) Draw cells and text
     for r, row in enumerate(lines):
         for c, syl in enumerate(row):
             y = rows - 1 - r
@@ -125,18 +103,45 @@ def visualize_lines(lines: List[List[str]]) -> None:
             ax.add_patch(Rectangle((c, y), 1, 1, facecolor=face, edgecolor='gray', zorder=1))
             ax.text(c + 0.5, y + 0.5, display[r][c], ha='center', va='center', color=tc, fontsize=fs, zorder=2)
 
-    # Легенда
+    # 2) Overlay sloka-level markers on top
+    for start in range(0, len(all_sylls), 32):
+        block = all_sylls[start:start+32]
+        if len(block) < 32:
+            continue
+        # determine starting row of this sloka block
+        # count how many rows above this sloka start
+        idx = start
+        row0 = rows - 1 - (idx // cols)
+        # block spans two rows: row0 and row0-1
+        y_block = row0 - 1
+        # width: 8 columns
+        w = min(cols, 8)
+        h = 2
+        if classify_pathya(block):
+            ax.add_patch(Rectangle((0, y_block), w, h, fill=True, facecolor='blue', alpha=0.3, zorder=3))
+        if detect_padayadi_yamaka(block):
+            ax.add_patch(Rectangle((0, y_block), w, h, fill=True, facecolor='green', alpha=0.3, zorder=3))
+        if detect_padaanta_yamaka(block):
+            ax.add_patch(Rectangle((0, y_block), w, h, fill=True, facecolor='red', alpha=0.3, zorder=3))
+
+    # 3) Overlay line-level anuprasa
+    for r, row in enumerate(lines):
+        if detect_vrttyanuprasa(row):
+            y = rows - 1 - r
+            ax.add_patch(Rectangle((0, y), len(row), 1, fill=True, facecolor='purple', alpha=0.3, zorder=3))
+
+    # 4) Legend
     legend = [
         Patch(facecolor='black', label='Guru'),
         Patch(facecolor='white', label='Laghu'),
-        Patch(facecolor='blue', alpha=0.1, label='Pathya Anuṣṭubh'),
-        Patch(facecolor='green', alpha=0.1, label='Pāda-ādi Yamaka'),
-        Patch(facecolor='red', alpha=0.1, label='Pāda-anta Yamaka'),
-        Patch(facecolor='purple', alpha=0.1, label='Vṛtti Anuprāsa')
+        Patch(facecolor='blue', alpha=0.3, label='Pathya Anuṣṭubh'),
+        Patch(facecolor='green', alpha=0.3, label='Pāda-ādi Yamaka'),
+        Patch(facecolor='red', alpha=0.3, label='Pāda-anta Yamaka'),
+        Patch(facecolor='purple', alpha=0.3, label='Vṛtti Anuprāsa')
     ]
     ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=8, frameon=False)
 
-    st.pyplot(fig)
+    st.pyplot(fig)(fig)
 
 # ===== UI =====
 st.title('Sloka Meter Visualizer')
