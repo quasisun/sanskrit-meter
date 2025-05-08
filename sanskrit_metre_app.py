@@ -37,15 +37,15 @@ def split_syllables(text):
     return [s[0] for s in syllables if s[0]]
 
 def is_guru(syl):
-    v = re.search(r'[aeiouāīūṛṝeaiou]', syl)
-    if not v:
+    match = re.match(r'^([^aeiouāīūṛṝeaiou]*)([aeiouāīūṛṝeaiou]+)(ṃ|ḥ)?(.*)$', syl)
+    if not match:
         return False
-    vowel = v.group()
+    _, vowel, nasal, after = match.groups()
     if vowel in long_vowels:
         return True
-    if re.search(r'[ṃḥ]', syl):
+    if nasal:
         return True
-    if re.search(r'[aeiouṛḷ]..', syl):
+    if re.match(r'^[^aeiouāīūṛṝeaiou]{2,}', after):
         return True
     return False
 
