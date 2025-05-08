@@ -1,6 +1,6 @@
 import streamlit as st
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle, Circle, Patch
+from matplotlib.patches import Rectangle, Patch
 import re
 import unicodedata
 
@@ -13,9 +13,6 @@ vipula_colors = {
     'Vidyunmālā': '#9370DB',  # Фиолетовый
     'Other': '#D3D3D3'        # Серый
 }
-
-anuprasa_color = 'blue'
-yamaka_color = 'purple'
 
 # ===== Обработка текста =====
 short_vowels = ['a', 'i', 'u', 'ṛ', 'ḷ']
@@ -63,14 +60,6 @@ def identify_vipula(half_shloka):
     }
     return vipula_patterns.get(pattern, 'Other')
 
-def detect_anuprasa(line):
-    initials = [re.match(r'[^\W\d_]*', syl).group(0) for syl in line if syl]
-    repeats = [s for s in initials if initials.count(s) > 1 and s]
-    return set(repeats)
-
-def detect_yamaka(line):
-    return set([s for s in line if line.count(s) > 1])
-
 # ===== Визуализация =====
 def visualize_block(syllables):
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -88,8 +77,6 @@ def visualize_block(syllables):
 
     for i in range(8):
         line = syllables[i * 8:(i + 1) * 8]
-        anuprasa_set = detect_anuprasa(line)
-        yamaka_set = detect_yamaka(line)
         for j, syl in enumerate(line):
             x, y = j, 7 - i
             guru = is_guru(syl)
@@ -104,23 +91,12 @@ def visualize_block(syllables):
             base_color = 'black' if guru else 'white'
             ax.add_patch(Rectangle((x, y), 1, 1, facecolor=base_color, edgecolor='black'))
 
-            # Anuprāsa border
-            initial = re.match(r'[^\W\d_]*', syl).group(0)
-            if initial in anuprasa_set:
-                ax.add_patch(Rectangle((x, y), 1, 1, fill=False, edgecolor=anuprasa_color, linewidth=2))
-
-            # Yamaka marker
-            if syl in yamaka_set:
-                ax.add_patch(Circle((x + 0.5, y + 0.5), 0.1, color=yamaka_color))
-
     ax.set_title(f'Vipula: {vipulas[0]}, {vipulas[1]}', fontsize=10)
 
     # Легенда
     legend_elements = [
         Patch(facecolor='black', edgecolor='black', label='Guru'),
-        Patch(facecolor='white', edgecolor='black', label='Laghu'),
-        Patch(edgecolor=anuprasa_color, facecolor='none', linewidth=2, label='Anuprāsa'),
-        Patch(facecolor=yamaka_color, label='Yamaka', alpha=0.5)
+        Patch(facecolor='white', edgecolor='black', label='Laghu')
     ]
     for name, color in vipula_colors.items():
         legend_elements.append(Patch(facecolor=color, alpha=0.3, label=f'Vipula: {name}'))
@@ -129,7 +105,7 @@ def visualize_block(syllables):
     st.pyplot(fig)
 
 # ===== Streamlit UI =====
-st.title("Shloka Visualizer: Guru, Laghu, Vipula, Anuprāsa, Yamaka")
+st.title("Shloka Visualizer: Guru, Laghu, Vipula")
 
 text_input = st.text_area("Введите шлоки на IAST (до 64 слогов на блок):", height=200)
 
