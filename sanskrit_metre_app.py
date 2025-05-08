@@ -11,18 +11,18 @@ short_vowels = ['a', 'i', 'u', 'f', 'x']  # SLP1 short vowels
 long_vowels = ['A', 'I', 'U', 'F', 'X', 'e', 'E', 'o', 'O']
 
 vipula_colors = {
-    'Nagari': '#FFA500',
-    'Bhavani': '#1E90FF',
-    'Shardula': '#32CD32',
-    'Arya': '#FF6347',
-    'Vidyunmala': '#9370DB',
-    'Other': '#D3D3D3'
+    'Nagari': '#FF7F00',      # ярко-оранжевый
+    'Bhavani': '#1E3F66',     # насыщенный тёмно-синий
+    'Shardula': '#2E8B57',    # морской зелёный
+    'Arya': '#8B0000',        # тёмно-красный
+    'Vidyunmala': '#9932CC',  # тёмный фиолетовый
+    'Other': '#555555'        # тёмно-серый, чтобы выделялся
 }
 
 anushtubh_colors = {
-    'Pathyā-anuṣṭubh': '#B0E0E6',
-    'Vipulā-anuṣṭubh': '#F5DEB3',
-    'Unknown': '#FFFFFF'
+    'Pathyā-anuṣṭubh': '#4682B4',     # steel blue
+    'Vipulā-anuṣṭubh': '#DAA520',     # goldenrod
+    'Unknown': '#A9A9A9'              # dim gray
 }
 
 def normalize(text):
@@ -118,7 +118,7 @@ def visualize_grid(syllables, line_length):
         for j in range(4):
             x, y = j, row
             color = vipula_colors[vipula_labels[idx]]
-            ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.3))
+            ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, alpha=0.65))
     ax.set_title(f"{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)
 
 
@@ -127,9 +127,9 @@ def visualize_grid(syllables, line_length):
         Patch(facecolor='white', edgecolor='black', label='Laghu')
     ]
     for name, color in vipula_colors.items():
-        legend_elements.append(Patch(facecolor=color, alpha=0.3, label=f'Vipula: {name}'))
+        legend_elements.append(Patch(facecolor=color, alpha=0.65, label=f'Vipula: {name}'))
     for name, color in anushtubh_colors.items():
-        legend_elements.append(Patch(facecolor=color, alpha=0.1, label=f'Type: {name}'))
+        legend_elements.append(Patch(facecolor=color, alpha=0.5, label=f'Type: {name}'))
 
     ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.4), ncol=2, fontsize=8)
     st.pyplot(fig)
