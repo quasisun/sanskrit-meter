@@ -130,7 +130,7 @@ def visualize_grid(syllables, line_length):
                     ax.add_patch(Rectangle((j, row_3), 1, 1, facecolor=vipula_colors[vipula_2], alpha=0.65))
 
     ax.set_title(f"{line_length}x{line_length} Grid — {metre_type}
-Vipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)(f"{line_length}x{line_length} Grid — {metre_type}\nVipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)
+Vipula: {vipula_labels[0]}, {vipula_labels[1]}", fontsize=10)
 
 
     legend_elements = [
