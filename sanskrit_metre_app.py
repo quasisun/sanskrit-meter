@@ -48,6 +48,29 @@ def is_guru(s: str) -> bool:
     _, vowel, nasal, after = m.groups()
     return vowel in long_vowels or bool(nasal) or len(after) >= 2
 
+# ===== Випула =====
+vipula_colors = {
+    'Nagari': '#FF7F00',
+    'Bhavani': '#1E3F66',
+    'Shardula': '#2E8B57',
+    'Arya': '#8B0000',
+    'Vidyunmala': '#9932CC'
+}
+
+def identify_vipula(sylls: List[str]) -> Optional[str]:
+    """Возвращает тип випулы по первым 4 слогам строки."""
+    if len(sylls) < 4:
+        return None
+    pattern = ''.join('g' if is_guru(s) else 'l' for s in sylls[:4])
+    mapping = {
+        'lglg': 'Nagari',
+        'lllg': 'Bhavani',
+        'llgg': 'Shardula',
+        'glgg': 'Arya',
+        'gglg': 'Vidyunmala'
+    }
+    return mapping.get(pattern)
+
 # ===== Метрики: pathya anuṣṭubh, yamaka, anuprāsa =====
 def classify_pathya(block: List[str]) -> bool:
     # объединяем 32 слога śloka
