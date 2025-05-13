@@ -165,4 +165,23 @@ st.set_page_config(page_title='Sloka Meter', layout='wide')
 
 st.title('Sloka Meter Visualizer')
 
-st.markdown("*Paste IAST, one pāda per line (`|`, `।
+# concise instructions (closed string!)
+st.markdown(
+    "*Paste IAST — one pāda per line. Separate pāda with `|`, `।`, or `॥`. "
+    "Click **Show** to display guru/laghu squares, vipulā fill, and yamaka / "
+    "anuprāsa / pathyā frames.*"
+)
+
+# ── sidebar legend (already defined above) remains unchanged ──
+
+# main input & display
+text = st.text_area('IAST input:', height=200)
+if st.button('Show'):
+    parts = [p.strip() for p in re.split(r'[।॥|]+', text) if p.strip()]
+    if not parts:
+        st.error('No valid lines found.')
+    else:
+        lines = [split_syllables_slp1(normalize(p)) for p in parts]
+        draw(lines)
+
+st.markdown("<div style='text-align:center; font-size:0.9em; margin-top:1em;'>App by Svetlana Kreuzer</div>", unsafe_allow_html=True)
