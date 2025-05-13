@@ -129,11 +129,10 @@ for lbl, col, fill in [
     ('Pāda-anta Yamaka', 'red', False)
 ]:
     style = f"background:{col};" if fill else f"border:2px solid {col};"
-    st.sidebar.markdown(
-        f\"<span style='display:inline-block;width:14px;"
-        f"height:14px;{style}'></span> {lbl}<br>\",
-        unsafe_allow_html=True
-    )
+st.sidebar.markdown(
+    f"<span style='display:inline-block;width:14px;height:14px;{style}'></span> {lbl}<br>",
+    unsafe_allow_html=True
+)
 
 txt = st.text_area('IAST input:', height=220)
 if st.button('Show'):
